@@ -1,0 +1,28 @@
+{
+    "tasks": [
+        {
+            "type": "cppbuild",
+            "label": "C/C++: xtensa-esp32-elf-gcc.exe sestavit aktivní soubor",
+            "command": "C:/Users/Charvi99/.platformio/packages/toolchain-xtensa32/bin/xtensa-esp32-elf-gcc.exe",
+            "args": [
+                "-g",
+                "${file}",
+                "-o",
+                "${fileDirname}\\${fileBasenameNoExtension}.exe",
+                "-mlongcalls"
+            ],
+            "options": {
+                "cwd": "C:/Users/Charvi99/.platformio/packages/toolchain-xtensa32/bin"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "detail": "Úloha vygenerovaná ladicím programem"
+        }
+    ],
+    "version": "2.0.0"
+}
