@@ -32,7 +32,7 @@ void Pump::setup()
 /* --- HLAVNI SMYCKA PUMPY --- */
 void Pump::loop()
 {
-    setting(Mover.JsonSettings);
+    setting(mainVariable.getJSONSettings());
     if (pumpa->status.Enable == true)
         run();
     else
@@ -44,16 +44,16 @@ void Pump::run()
 {
     switch (parameters.Mode)
     {
-    case MANUAL:
+    case Parameters::MANUAL:
         runManual();
         break;
-    case SEMIAUTOMAT:
+    case Parameters::SEMIAUTOMAT:
         runSemiManual();
         break;
-    case AUTOMAT:
+    case Parameters::AUTOMAT:
         runDose();
         break;
-    case INTERVAL:
+    case Parameters::INTERVAL:
         runIntervalDose();
         break;
     default:
@@ -137,20 +137,20 @@ void Pump::setting(String settings)
         {
             const char *name = incomeMessage[i]["Name"];
             int val = incomeMessage[i]["Value"];
-
+            Parameters mod;
             if (strcmp(name, "Mode") == 0)
             {
-                Pump::mode mod;
+                
                 if (val == 0)
-                    mod = MANUAL;
+                    mod.Mode = Parameters::MANUAL;
                 else if (val == 1)
-                    mod = SEMIAUTOMAT;
+                    mod.Mode = Parameters::SEMIAUTOMAT;
                 else if (val == 2)
-                    mod = AUTOMAT;
+                    mod.Mode = Parameters::AUTOMAT;
                 else if (val == 3)
-                    mod = INTERVAL;
+                    mod.Mode = Parameters::INTERVAL;
                 else
-                    mod = MANUAL;
+                    mod.Mode = Parameters::MANUAL;
                 setMode(mod);
             }
             if (strcmp(name, "Dose") == 0)
@@ -210,17 +210,17 @@ void Pump::setRamp(unsigned short content)
     parameters.RampTime = content;
     disp->menu.insertValueIntoTheFreakingSetting("Ramp", content);
 }
-void Pump::setMode(Pump::mode content)
+void Pump::setMode(Parameters content)
 {
-    parameters.Mode = content;
+    parameters.Mode = content.Mode;
 
-    if (content == MANUAL)
+    if (content.Mode == Parameters::MANUAL)
         disp->dispSetMode("MANUAL");
-    else if (content == SEMIAUTOMAT)
+    else if (content.Mode == Parameters::SEMIAUTOMAT)
         disp->dispSetMode("SEMIAUTOMAT");
-    else if (content == AUTOMAT)
+    else if (content.Mode == Parameters::AUTOMAT)
         disp->dispSetMode("AUTOMAT");
-    else if (content == INTERVAL)
+    else if (content.Mode == Parameters::INTERVAL)
         disp->dispSetMode("INTERVAL");
     else
         disp->dispSetMode("MANUAL");

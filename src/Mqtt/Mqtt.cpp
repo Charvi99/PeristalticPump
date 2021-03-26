@@ -83,11 +83,11 @@ void callback(char *topic, byte *message, unsigned int length)
   {
     //Serial.print((char)message[i]);
     if (topic[12] == 'd') //topic == peristlatic/data
-      Mover.JsonData += (char)message[i];
+      mainVariable.getJSONData() += (char)message[i];
     if (topic[12] == 's') //topic == peristlatic/settings
-      Mover.JsonSettings += (char)message[i];
+      mainVariable.getJSONSettings() += (char)message[i];
   }
-  Serial.println(Mover.JsonSettings);
+  Serial.println(mainVariable.getJSONSettings());
 }
 
 /* --- API PRO ODESLANI ZPRAVY --- */

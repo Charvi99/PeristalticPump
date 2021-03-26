@@ -106,6 +106,7 @@ void buttonStateLoop(Button2 &btn)
 /* --- REAKCE NA AKCE ENKODERU --- */
 void Control::encoderLoop()
 {
+    
     long currentCount = controlEncoder.getCount();
     if (currentCount != 0)
     {
@@ -135,6 +136,7 @@ void Control::encoderLoop()
 /* --- KONTROLA STAVU TLACITEK, KLAVESNICE A ENKODERU--- */
 void Control::loop()
 {
+    Serial.println("Im Here ControlLoop");
     start_btn.loop();
     stop_btn.loop();
     encoder_btn.loop();
@@ -142,14 +144,16 @@ void Control::loop()
     encoderLoop();
     if ((pumpa->status.Running == false) && (digitalRead(19) == LOW || digitalRead(23) == LOW || digitalRead(18) == LOW || digitalRead(5) == LOW))
     {
+        Parameters param;
         if (digitalRead(19) == LOW)
-            pumpa->setMode(Pump::mode::MANUAL);
+            param.Mode = Parameters::MANUAL;
         else if (digitalRead(23) == LOW)
-            pumpa->setMode(Pump::mode::SEMIAUTOMAT);
+            param.Mode = Parameters::SEMIAUTOMAT;
         else if (digitalRead(18) == LOW)
-            pumpa->setMode(Pump::mode::AUTOMAT);
+            param.Mode = Parameters::AUTOMAT;
         else if (digitalRead(5) == LOW)
-            pumpa->setMode(Pump::mode::INTERVAL);
+            param.Mode = Parameters::INTERVAL;
+        pumpa->setMode(param);
     }
     else if ((pumpa->status.Running == true) && (digitalRead(19) == LOW || digitalRead(23) == LOW || digitalRead(18) == LOW || digitalRead(5) == LOW))
         disp->dispSetInfo("Pri behu nelze zmenit mod rizeni", false);
