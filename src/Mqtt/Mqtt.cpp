@@ -13,12 +13,12 @@ MQTT::MQTT()
   client.setClient(espClient);
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);
-  
 }
 
 /* --- METODA ZRIZUJICI PRIPOJENI K WIFI A VYTVORENI KLIENTA --- */
 void MQTT::MQTTbegin()
 {
+
   setupWifi();
 
   client.connect("ESP32", mqtt_user, mqtt_pass);
@@ -32,24 +32,27 @@ void MQTT::MQTTbegin()
 /* ---  PRIPOJENI K WIFI --- */
 void MQTT::setupWifi()
 {
-  delay(10);
-  // We start by connecting to a WiFi network
-  Serial.println();
-  Serial.print("Connecting to ");
-  Serial.println(ssid);
-
-  WiFi.begin(ssid, password);
-
-  while (WiFi.status() != WL_CONNECTED)
+  if (WiFi.status() != WL_CONNECTED)
   {
-    delay(500);
-    Serial.print(".");
-  }
+    delay(10);
+    // We start by connecting to a WiFi network
+    Serial.println();
+    Serial.print("Connecting to ");
+    Serial.println(ssid);
 
-  Serial.println("");
-  Serial.println("WiFi connected");
-  Serial.println("IP address: ");
-  Serial.println(WiFi.localIP());
+    WiFi.begin(ssid, password);
+
+    while (WiFi.status() != WL_CONNECTED)
+    {
+      delay(500);
+      Serial.print(".");
+    }
+
+    Serial.println("");
+    Serial.println("WiFi connected");
+    Serial.println("IP address: ");
+    Serial.println(WiFi.localIP());
+  }
 }
 
 /* --- METODA VOLANA PRI ODPOJENI KLIENTA --- */
@@ -105,7 +108,7 @@ void MQTT::subscribe(const char *topic)
 /* --- HLAVNI MQTT SMYCKA KONTROLUJICI PRICHOZI ZPRAVY A OBNOVENI SPOJENI SE SERVEREM --- */
 void MQTT::loop()
 {
-  if (!client.connected())
+  if (!client.connected() && mainVariable.getDisplay().menu.settings[9].NumValue == 1)
     reconnect();
   client.loop();
 }

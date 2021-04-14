@@ -15,6 +15,10 @@ Pump::Pump()
     pumpEncoder.attachHalfQuad(ENCODER_A, ENCODER_B);
     pumpEncoder.clearCount();
     ina219.setCalibration_32V_2A();
+
+    pinMode(SSR_PIN, OUTPUT);
+    analogWrite(SSR_PIN, 255);
+    stop();
 }
 void Pump::setup()
 {
@@ -33,7 +37,8 @@ void Pump::setup()
 void Pump::loop()
 {
     setting(mainVariable.getJSONSettings());
-    if (pumpa->status.Enable == true)
+    //settings.MaxSpeed++;
+    if (mainVariable.getPump().status.Enable == true)
         run();
     else
         stop();
@@ -62,19 +67,28 @@ void Pump::run()
     }
 }
 
-
 /* --- PLNE MANUALNI MOD VYZADUJE DRZENI TL. START --- */
 void Pump::runManual()
 {
     //Serial.println("Manual Running");
-    analogWrite(settings.Pin, parameters.Speed, parameters.Speed);
+    //analogWrite(settings.Pin, parameters.Speed, parameters.Speed);
+    digitalWrite(DRIVER_ENABLE_PIN, GO);
+    digitalWrite(DRIVER_DIRECTION_PIN_CW, !parameters.Direction);
+    digitalWrite(DRIVER_DIRECTION_PIN_ACW, parameters.Direction);
+    Serial.println("Jedu MANUAL");
+
     status.Running = true;
 }
 
 /* --- SEMIMANUALNI MOD ZAPNE DAVKOVANI STIKEM TL. START, VYPNE JEJ STISKEM TL. STOP --- */
 void Pump::runSemiManual()
 {
-    analogWrite(settings.Pin, parameters.Speed, parameters.Speed);
+    //analogWrite(settings.Pin, parameters.Speed, parameters.Speed);
+    digitalWrite(DRIVER_ENABLE_PIN, GO);
+    digitalWrite(DRIVER_DIRECTION_PIN_CW, !parameters.Direction);
+    digitalWrite(DRIVER_DIRECTION_PIN_ACW, parameters.Direction);
+    Serial.println("Jedu SEMIMANUAL");
+
     status.Running = true;
 }
 
@@ -107,18 +121,38 @@ void Pump::stop()
 {
     status.Running = false;
     status.Enable = false;
-    analogWrite(settings.Pin, 0, parameters.Speed);
+    analogWrite(SSR_PIN, 0);
+    digitalWrite(DRIVER_ENABLE_PIN, STOP);
+    digitalWrite(DRIVER_DIRECTION_PIN_CW, HIGH);
+    digitalWrite(DRIVER_DIRECTION_PIN_CW, LOW);
+    Serial.println("Prave ted by mela byt pumpa vypnuta");
 }
 
 /* --- VYPNUTI/ZAPNUTI PUMPY --- */
 void Pump::pumpEnable()
 {
     status.Enable = true;
+    analogWrite(SSR_PIN, 255);
 }
 void Pump::pumpDisable()
 {
-    status.Enable = false;
     stop();
+    status.Enable = false;
+}
+
+/* --- NAPLNENI TRUBEK --- */
+void Pump::fillTubes()
+{
+    if (status.filledTubes == false)
+    {
+        int tubeVolume = 3.14159 * settings.tubeLenght * settings.tubeLenght * settings.tubeLenght;
+        setDose(tubeVolume);
+        setMode(2);
+        pumpEnable();
+        status.filledTubes = true;
+    }
+    else
+        mainVariable.getDisplay().dispSetInfo("Tubes are already \n filled", true);
 }
 
 /* --- METODA PARSUJICI JSON GLOBALNIHO NASTAVENI A JEHO APLIKOVANI DO PROGRAMU V PRIPADE ZMENY --- */
@@ -140,18 +174,7 @@ void Pump::setting(String settings)
             Parameters mod;
             if (strcmp(name, "Mode") == 0)
             {
-                
-                if (val == 0)
-                    mod.Mode = Parameters::MANUAL;
-                else if (val == 1)
-                    mod.Mode = Parameters::SEMIAUTOMAT;
-                else if (val == 2)
-                    mod.Mode = Parameters::AUTOMAT;
-                else if (val == 3)
-                    mod.Mode = Parameters::INTERVAL;
-                else
-                    mod.Mode = Parameters::MANUAL;
-                setMode(mod);
+                setMode(val);
             }
             if (strcmp(name, "Dose") == 0)
             {
@@ -184,51 +207,92 @@ void Pump::setting(String settings)
 void Pump::setDose(unsigned short content)
 {
     parameters.Dose = content;
-    disp->menu.insertValueIntoTheFreakingSetting("Dose", content);
+    mainVariable.getDisplay().menu.insertValueIntoTheFreakingSetting("Dose", content, String(content));
 }
 
 void Pump::setSpeed(unsigned short content)
 {
-    if (content < settings.MaxSpeed)
-        parameters.Speed = content;
-    disp->menu.insertValueIntoTheFreakingSetting("Speed", content);
+    if (content < 10)
+        if (content < settings.MaxSpeed)
+            parameters.Speed = content * 10;
+    mainVariable.getDisplay().menu.insertValueIntoTheFreakingSetting("Speed", content, String(content * 10));
 }
 
 void Pump::setDirection(bool content)
 {
     parameters.Direction = content;
     //digitalWrite(0, param.Direction);
-    disp->menu.insertValueIntoTheFreakingSetting("Direction", content);
+    String pom = "";
+
+    if (content)
+        pom = "CW";
+    else
+        pom = "ACW";
+    mainVariable.getDisplay().menu.insertValueIntoTheFreakingSetting("Direction", content, pom);
 }
 void Pump::setInterval(unsigned long content)
 {
     parameters.Interval = content;
-    disp->menu.insertValueIntoTheFreakingSetting("Interval", content);
+    mainVariable.getDisplay().menu.insertValueIntoTheFreakingSetting("Interval", content, String(content));
 }
 void Pump::setRamp(unsigned short content)
 {
     parameters.RampTime = content;
-    disp->menu.insertValueIntoTheFreakingSetting("Ramp", content);
+    mainVariable.getDisplay().menu.insertValueIntoTheFreakingSetting("Ramp", content, String(content));
 }
-void Pump::setMode(Parameters content)
+void Pump::setMode(unsigned int val)
 {
-    parameters.Mode = content.Mode;
+    char *pom = "";
+    if (val == 0)
+    {
+        pom = "MANUAL";
+        parameters.Mode = Parameters::MANUAL;
+    }
 
-    if (content.Mode == Parameters::MANUAL)
-        disp->dispSetMode("MANUAL");
-    else if (content.Mode == Parameters::SEMIAUTOMAT)
-        disp->dispSetMode("SEMIAUTOMAT");
-    else if (content.Mode == Parameters::AUTOMAT)
-        disp->dispSetMode("AUTOMAT");
-    else if (content.Mode == Parameters::INTERVAL)
-        disp->dispSetMode("INTERVAL");
+    else if (val == 1)
+    {
+        pom = "SEMIAUTOMAT";
+        parameters.Mode = Parameters::SEMIAUTOMAT;
+    }
+
+    else if (val == 2)
+    {
+        pom = "AUTOMAT";
+        parameters.Mode = Parameters::AUTOMAT;
+    }
+
+    else if (val == 3)
+    {
+        pom = "INTERVAL";
+        parameters.Mode = Parameters::INTERVAL;
+    }
+
     else
-        disp->dispSetMode("MANUAL");
+    {
+        pom = "MANUAL";
+        parameters.Mode = Parameters::MANUAL;
+    }
+
+    mainVariable.getDisplay().dispSetMode(pom);
+    String subPom = String(pom).substring(0, 6);
+    mainVariable.getDisplay().menu.insertValueIntoTheFreakingSetting("Mode", val, subPom);
+}
+
+void Pump::setTubeLenght(unsigned short content)
+{
+    settings.tubeLenght = content;
+    mainVariable.getDisplay().menu.insertValueIntoTheFreakingSetting("Tube lenght", content, String(content));
+}
+void Pump::setTubeDiameter(unsigned short content)
+{
+    settings.tubeDiameter = content;
+    mainVariable.getDisplay().menu.insertValueIntoTheFreakingSetting("Tube diameter", content, String(content));
 }
 void Pump::setMaxCurrent(unsigned short content)
 {
     settings.MaxCurrent = content;
 }
+
 unsigned short Pump::getMaxCurrent()
 {
     return settings.MaxCurrent;
@@ -252,7 +316,7 @@ void Pump::measurementLoop()
 {
     //Serial.println("Measurement Running");
 
-    //float current = getCurrent();
+    float current = getCurrent();
     //Serial.println(current);
     /*        
         Serial.print("Proud: ");

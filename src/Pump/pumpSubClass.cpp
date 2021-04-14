@@ -17,6 +17,8 @@ Settings::Settings()
     MaxCurrent = 200;
     MaxSpeed = 100;
     RotationToMl = 500;
+    tubeLenght = 300;
+    tubeDiameter = 3;
 }
 
 Parameters::Parameters()
@@ -37,4 +39,7 @@ Status::Status()
     ActuallRotationCount = 0;
     WantedRotationCount = 0;
     ActuallCurrent = 0;
+    filledTubes = false;
+    wifiConected = false;
+    MQTTConnected = false;
 }

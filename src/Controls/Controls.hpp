@@ -3,12 +3,12 @@
 #include <ezButton.h>
 #include "Button2.h"
 
-#define START_BTN 26
-#define STOP_BTN 27
+#define START_BTN 15
+#define STOP_BTN 0  
 
-#define CONTROL_ENCODER_BTN 16
+#define CONTROL_ENCODER_BTN 17
 #define CONTROL_ENCODER_A 4
-#define CONTROL_ENCODER_B 17
+#define CONTROL_ENCODER_B 16
 
 #define MANUAL_BTN 4
 #define SEMIAUTOMAT_BTN 5
@@ -33,4 +33,6 @@ public:
 };
 extern Control *control;
     
-void buttonStateLoop(Button2 &btn);
+void buttonReleaseLoop(Button2 &btn);
+void buttonPressLoop(Button2 &btn);
+

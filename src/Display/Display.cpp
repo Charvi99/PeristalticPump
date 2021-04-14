@@ -7,10 +7,12 @@ Display::Display()
     myNex.begin(115200);
     activePage = 0;
     switcher = true;
+    enterNextionCommand();
     Serial.print("page 0");
     enterNextionCommand();
 
     initilazePic();
+    menu.contentShow(activePage);
 }
 /* --- ODESLANI DAT NA DISPLEJ --- */
 void Display::dispSetMode(char *content)
@@ -42,17 +44,39 @@ void Display::dispSetInfo(char *content, bool warning)
     enterNextionCommand();
     if (warning == false)
     {
-        myNex.writeNum("t3.xcen", 1);
-        myNex.writeNum("t3.bco", UNFOCUSED_NAME_BC);
-        myNex.writeNum("t3.pco", UNFOCUSED_NAME_PC);
-        myNex.writeStr("t3.txt", content);
+        myNex.writeNum("info_p.pic", 12);
+        myNex.writeNum("info_t.xcen", 0);
+        myNex.writeNum("info_t.bco", UNFOCUSED_NAME_BC);
+        myNex.writeNum("info_t.pco", UNFOCUSED_NAME_PC);
+        myNex.writeStr("info_t.txt", content);
     }
     else
     {
-        myNex.writeNum("t3.xcen", 0);
-        myNex.writeNum("t3.bco", FOCUSED_NAME_BC);
-        myNex.writeNum("t3.pco", FOCUSED_NAME_PC);
-        myNex.writeStr("t3.txt", content);
+        myNex.writeNum("info_p.pic", 13);
+        myNex.writeNum("info_t.xcen", 1);
+        myNex.writeNum("info_t.bco", FOCUSED_NAME_BC);
+        myNex.writeNum("info_t.pco", FOCUSED_NAME_PC);
+        myNex.writeStr("info_t.txt", content);
+    }
+}
+void Menu::dispSetInfo(char *content, bool warning)
+{
+    enterNextionCommand();
+    if (warning == false)
+    {
+        myNex.writeNum("info_p.pic", 12);
+        myNex.writeNum("info_t.xcen", 0);
+        myNex.writeNum("info_t.bco", UNFOCUSED_NAME_BC);
+        myNex.writeNum("info_t.pco", UNFOCUSED_NAME_PC);
+        myNex.writeStr("info_t.txt", content);
+    }
+    else
+    {
+        myNex.writeNum("info_p.pic", 13);
+        myNex.writeNum("info_t.xcen", 1);
+        myNex.writeNum("info_t.bco", FOCUSED_NAME_BC);
+        myNex.writeNum("info_t.pco", FOCUSED_NAME_PC);
+        myNex.writeStr("info_t.txt", content);
     }
 }
 
@@ -75,29 +99,23 @@ void Display::dispRun(bool content)
 /* --- HLAVNI SMYCKA PRO DISPLEJ --- */
 void Display::loop(bool up, bool down)
 {
-    myNex.NextionListen();
+    //myNex.NextionListen();
 
     if (activePage == 1)
     {
-        if (up == true)
+        if (up == true && down == false)
         {
-            up = false;
             if (menu.searchForSelected() == -1) //nic neni vybrano -> posun v menu
                 menu.focusUp();
             else ///neco je vybrano -> zmena hodnoty
                 menu.IncreseVal();
         }
-        else if (down == true)
+        else if (down == true && up == false)
         {
-            down = false;
             if (menu.searchForSelected() == -1) //nic neni vybrano -> posun v menu
                 menu.focusDown();
             else ///neco je vybrano -> zmena hodnoty
                 menu.DecreseVal();
-        }
-        else
-        {
-            //Serial.println("NOTHING");
         }
     }
 }
@@ -121,12 +139,15 @@ Menu::Menu()
     settings[0].Unit = "";
 
     /* --- MANUÁALNI VKLADANI PRVKU DO DISPLEJE --- */
-    settings[1] = {"Mode", "0", 0, ""};
-    settings[2] = {"Dose", "0", 0, "ml"};
-    settings[3] = {"Direction", "0", 0, ""};
-    settings[4] = {"Speed", "0", 0, "%"};
+    settings[1] = {"Mode", "MANUAL", 0, ""};
+    settings[2] = {"Dose", "100", 100, "ml"};
+    settings[3] = {"Direction", "CW", 0, ""};
+    settings[4] = {"Speed", "100", 10, "%"};
     settings[5] = {"Interval", "0", 0, "s"};
     settings[6] = {"Ramp", "0", 0, "s"};
+    settings[7] = {"Tube lenght", "30", 30, "mm"};
+    settings[8] = {"Tube diameter", "3", 3, "mm"};
+    settings[9] = {"MQTT", "OFF", 0, ""};
 
     for (size_t i = 0; i < 4; i++)
         Items[i].storedItem = i;
@@ -136,7 +157,7 @@ Menu::Menu()
     myNex.begin(115200);
     myNex.writeNum("p_" + String(focusedIndex) + ".pic", UNFOCUSED);
 
-    contentShow();
+    contentShow(1);
 }
 
 /* --- POSUN FOCUSU NA PRVEK O INDEX NIZ --- */
@@ -147,7 +168,7 @@ void Menu::focusUp()
     {
         myNex.writeNum("p_" + String(focusedIndex) + ".pic", UNFOCUSED);
         myNex.writeNum("p_" + String(--focusedIndex) + ".pic", FOCUSED);
-        contentShow();
+        contentShow(1);
     }
     else
     {
@@ -166,7 +187,7 @@ void Menu::focusDown()
     {
         myNex.writeNum("p_" + String(focusedIndex) + ".pic", UNFOCUSED);
         myNex.writeNum("p_" + String(++focusedIndex) + ".pic", FOCUSED);
-        contentShow();
+        contentShow(1);
     }
     else
     {
@@ -203,10 +224,8 @@ void Menu::selectFocused()
     /* --- POKUD JE VYBRAN PRVEK "<- Back" PREPNE SE STRANA --- */
     if (settings[Items[focusedIndex].storedItem].Name == "<- Back")
     {
-        disp->activePage = 0;
-        Serial.print("page ");
-        Serial.print(disp->activePage);
-        enterNextionCommand();
+        mainVariable.getDisplay().activePage = 0;
+        mainVariable.getDisplay().setPage(0);
     }
     else
     {
@@ -219,7 +238,7 @@ void Menu::selectFocused()
         myNex.writeNum("unit_" + String(focusedIndex) + ".bco", FOCUSED_UNIT_BC);
         myNex.writeNum("unit_" + String(focusedIndex) + ".pco", FOCUSED_UNIT_PC);
 
-        contentShow();
+        contentShow(1);
     }
 
     Serial.println("SELECTED");
@@ -239,33 +258,94 @@ void Menu::deselectFocused()
     myNex.writeNum("val_" + String(focusedIndex) + ".pco", UNFOCUSED_UNIT_PC);
     myNex.writeNum("unit_" + String(focusedIndex) + ".bco", UNFOCUSED_UNIT_BC);
     myNex.writeNum("unit_" + String(focusedIndex) + ".pco", UNFOCUSED_UNIT_PC);
-    contentShow();
+    contentShow(1);
 
     Serial.println("DESELECTED");
     Serial.println("DESELECTED");
 
-    if (mqtt->client.connected())
+    /* --- APLIKOVANI ZMEN NA MQTT --- */
+
+    if (settings[9].NumValue == 1)
+    {
+        if (mainVariable.getMQTT().client.connected() == false)
+            mainVariable.getMQTT().MQTTbegin();
+    }
+    else if (settings[9].NumValue == 0)
+    {
+        if (mainVariable.getMQTT().client.connected() == true)
+            mainVariable.getMQTT().client.disconnect();
+    }
+
+    /* --- ODESLANI NOVE NASTAVENYCH DAT PRES MQTT --- */
+
+    if (mainVariable.getMQTT().client.connected())
     {
         DynamicJsonDocument settingsToSend(1024);
         for (size_t i = 0; i < SETTINGS_COUNT; i++)
         {
-            settingsToSend[i]["Name"] = disp->menu.settings[i].Name;
-            settingsToSend[i]["Value"] = disp->menu.settings[i].Value;
-            settingsToSend[i]["Unit"] = disp->menu.settings[i].Unit;
+            settingsToSend[i]["Name"] = settings[i].Name;
+            settingsToSend[i]["Value"] = settings[i].Value;
+            settingsToSend[i]["Unit"] = settings[i].Unit;
         }
         String settingsToSendString = "";
         serializeJson(settingsToSend, settingsToSendString);
-        mqtt->publish("peristaltic/settings", settingsToSendString.c_str());
+        mainVariable.getMQTT().publish("peristaltic/settings", settingsToSendString.c_str());
     }
 }
 
 /* --- NAPLNENI TEXTOVYCH OKEN ODPOVIDAJICIM TEXTEM --- */
-void Menu::contentShow()
+void Menu::contentShow(int page)
 {
-    for (size_t i = 0; i < 4; i++)
+    if (page == 0)
     {
-        displayContentInItem(i, Items[i].storedItem);
+        enterNextionCommand();
+        myNex.writeStr("t0.txt", settings[1].Value);
+        String infoText = "";
+
+        if (settings[1].NumValue == 1)
+        {
+            infoText += settings[4].Name + ": " + settings[4].Value + " [" + settings[4].Unit + "]" + "\r" + "\n";
+            infoText += settings[6].Name + ": " + settings[6].Value + " [" + settings[6].Unit + "]" + "\r" + "\n";
+            infoText += settings[9].Name + ": " + settings[9].Value + " [-]" + "\r" + "\n";
+        }
+        else if (settings[1].NumValue == 2)
+        {
+            infoText += settings[4].Name + ": " + settings[4].Value + " [" + settings[4].Unit + "]" + "\r" + "\n";
+            infoText += settings[2].Name + ": " + settings[2].Value + " [" + settings[2].Unit + "]" + "\r" + "\n";
+            infoText += settings[6].Name + ": " + settings[6].Value + " [" + settings[6].Unit + "]" + "\r" + "\n";
+            infoText += settings[9].Name + ": " + settings[9].Value + " [-]" + "\r" + "\n";
+        }
+        else if (settings[1].NumValue == 3)
+        {
+            infoText += settings[4].Name + ": " + settings[4].Value + " [" + settings[4].Unit + "]" + "\r" + "\n";
+            infoText += settings[2].Name + ": " + settings[2].Value + " [" + settings[2].Unit + "]" + "\r" + "\n";
+            infoText += settings[5].Name + ": " + settings[5].Value + " [" + settings[5].Unit + "]" + "\r" + "\n";
+            infoText += settings[6].Name + ": " + settings[6].Value + " [" + settings[6].Unit + "]" + "\r" + "\n";
+            infoText += settings[9].Name + ": " + settings[9].Value + " [-]" + "\r" + "\n";
+        }
+        else
+        {
+            infoText += settings[4].Name + ": \r" + settings[4].Value + " \r[" + settings[4].Unit + "]" + "\r" + "\r" + "\r" + "\n";
+            infoText += settings[6].Name + ": \r\r" + settings[6].Value + " \r\r\r\r\r[" + settings[6].Unit + "]" + "\r" + "\n";
+            infoText += settings[9].Name + ": \r" + settings[9].Value + " \r[-]" + "\r" + "\n";
+        }
+        int n = infoText.length();
+        char infoText_array[n + 1];
+        strcpy(infoText_array, infoText.c_str());
+        dispSetInfo(infoText_array, false);
     }
+    else if (page == 1)
+    {
+        for (size_t i = 0; i < 4; i++)
+        {
+            displayContentInItem(i, Items[i].storedItem);
+        }
+    }
+}
+void Menu::newLine()
+{
+    Serial.write(0x0d);
+    Serial.write(0x0a);
 }
 
 /* --- POSUN TEXTU PRI POSUNU PRVKU --- */
@@ -275,7 +355,7 @@ void Menu::contentUp()
         for (size_t i = 0; i < 4; i++)
             displayContentInItem(i, Items[i].storedItem - 1);
     else
-        contentShow();
+        contentShow(1);
 }
 void Menu::contentDown()
 {
@@ -283,7 +363,7 @@ void Menu::contentDown()
         for (size_t i = 0; i < 4; i++)
             displayContentInItem(i, Items[i].storedItem + 1);
     else
-        contentShow();
+        contentShow(1);
 }
 
 /* --- NAPLNI TEXTEM KONKRETNI PRVEK--- */
@@ -293,39 +373,170 @@ void Menu::displayContentInItem(int item, int content)
 
     String itemName = "name_" + String(item) + ".txt";
     myNex.writeStr(itemName, settings[content].Name);
-    itemName = "val_" + String(item) + ".txt";
-    myNex.writeStr(itemName, settings[content].Value);
+
+    if (settings[content].Name == "Mode")
+    {
+        itemName = "val_" + String(item) + ".font";
+        myNex.writeNum(itemName, 0);
+
+        itemName = "val_" + String(item) + ".txt";
+        myNex.writeStr(itemName, settings[content].Value);
+    }
+    else
+    {
+        itemName = "val_" + String(item) + ".font";
+        myNex.writeNum(itemName, 4);
+
+        itemName = "val_" + String(item) + ".txt";
+        myNex.writeStr(itemName, settings[content].Value);
+    }
+
     itemName = "unit_" + String(item) + ".txt";
     myNex.writeStr(itemName, settings[content].Unit);
+
     Items[item].storedItem = content;
 }
 
 /* --- ROZBRAZENI ZVYSENE HODNOTY --- */
 void Menu::IncreseVal()
 {
-    settings[Items[searchForSelected()].storedItem].NumValue++;
-    settings[Items[searchForSelected()].storedItem].Value = String(settings[Items[searchForSelected()].storedItem].NumValue);
-    contentShow();
+    unsigned int index = Items[searchForSelected()].storedItem;
+    if (settings[index].Name == "Mode")
+    {
+        if (settings[index].NumValue > 4)
+            settings[index].NumValue = 1;
+
+        mainVariable.getPump().setMode((settings[index].NumValue++));
+    }
+    else if (settings[index].Name == "Dose")
+    {
+        mainVariable.getPump().setMode(settings[index].NumValue + 1);
+    }
+    else if (settings[index].Name == "Direction")
+    {
+
+        if ((settings[index].NumValue) == 0)
+        {
+            settings[index].NumValue = 1;
+            mainVariable.getPump().setDirection(true);
+        }
+        else
+        {
+            settings[index].NumValue = 0;
+            mainVariable.getPump().setDirection(false);
+        }
+    }
+    else if (settings[index].Name == "Speed")
+    {
+        mainVariable.getPump().setSpeed(settings[index].NumValue + 1);
+    }
+    else if (settings[index].Name == "Interval")
+    {
+        mainVariable.getPump().setInterval(settings[index].NumValue + 1);
+    }
+    else if (settings[index].Name == "Ramp")
+    {
+        mainVariable.getPump().setRamp(settings[index].NumValue + 1);
+    }
+    else if (settings[index].Name == "Tube lenght")
+    {
+        mainVariable.getPump().setTubeLenght(settings[index].NumValue++);
+    }
+    else if (settings[index].Name == "Tube diameter")
+    {
+        mainVariable.getPump().setTubeDiameter(settings[index].NumValue++);
+    }
+    else if (settings[index].Name == "MQTT")
+    {
+        if (settings[index].NumValue == 0)
+        {
+            settings[index].NumValue = 1;
+            insertValueIntoTheFreakingSetting(settings[index].Name, 1, "ON");
+        }
+        else
+        {
+            settings[index].NumValue = 0;
+            insertValueIntoTheFreakingSetting(settings[index].Name, 0, "OFF");
+        }
+    }
+    contentShow(1);
 }
 
 /* --- ROZBRAZENI SNIZENE HODNOTY --- */
 void Menu::DecreseVal()
 {
-    settings[Items[searchForSelected()].storedItem].NumValue--;
-    settings[Items[searchForSelected()].storedItem].Value = String(settings[Items[searchForSelected()].storedItem].NumValue);
-    contentShow();
+    unsigned int index = Items[searchForSelected()].storedItem;
+    if ((settings[index].NumValue - 1) >= 0)
+        if (settings[index].Name == "Mode")
+        {
+            if (settings[index].NumValue <= 1)
+                settings[index].NumValue = 4;
+
+            mainVariable.getPump().setMode((settings[index].NumValue--));
+        }
+        else if (settings[index].Name == "Dose")
+        {
+            mainVariable.getPump().setMode(settings[index].NumValue - 1);
+        }
+        else if (settings[index].Name == "Direction")
+        {
+            if ((settings[index].NumValue) == 0)
+            {
+                settings[index].NumValue = 1;
+                mainVariable.getPump().setDirection(true);
+            }
+            else
+            {
+                settings[index].NumValue = 0;
+                mainVariable.getPump().setDirection(false);
+            }
+        }
+        else if (settings[index].Name == "Speed")
+        {
+            mainVariable.getPump().setSpeed(settings[index].NumValue - 1);
+        }
+        else if (settings[index].Name == "Interval")
+        {
+            mainVariable.getPump().setInterval(settings[index].NumValue - 1);
+        }
+        else if (settings[index].Name == "Ramp")
+        {
+            mainVariable.getPump().setRamp(settings[index].NumValue - 1);
+        }
+        else if (settings[index].Name == "Tube lenght")
+        {
+            mainVariable.getPump().setTubeLenght(settings[index].NumValue--);
+        }
+        else if (settings[index].Name == "Tube diameter")
+        {
+            mainVariable.getPump().setTubeDiameter(settings[index].NumValue--);
+        }
+        else if (settings[index].Name == "MQTT")
+        {
+            if (settings[index].NumValue == 0)
+            {
+                settings[index].NumValue = 1;
+                insertValueIntoTheFreakingSetting(settings[index].Name, 1, "ON");
+            }
+            else
+            {
+                settings[index].NumValue = 0;
+                insertValueIntoTheFreakingSetting(settings[index].Name, 0, "OFF");
+            }
+        }
+    contentShow(1);
 }
 
 /* --- ZVYSENA HODNOTA SE ULOZI DO GLOBALNIHO NASTAVENI --- */
-void Menu::insertValueIntoTheFreakingSetting(String itemName, int value)
+void Menu::insertValueIntoTheFreakingSetting(String itemName, int numValue, String value)
 {
     for (size_t i = 0; i < SETTINGS_COUNT; i++)
         if (itemName == settings[i].Name)
         {
-            settings[i].NumValue = value;
-            settings[i].Value = String(value);
+            settings[i].NumValue = numValue;
+            settings[i].Value = value;
         }
-    contentShow();
+    contentShow(1);
 }
 
 /* --- ZOBRAZENI POZADI VSECH PRVKU MENU --- */
@@ -342,6 +553,27 @@ void Display::initilazePic()
     enterNextionCommand();
     Serial.print("p_3.pic=9");
     enterNextionCommand();
+}
+
+void Display::setPage(int page)
+{
+    if (page == 0)
+    {
+        enterNextionCommand();
+        Serial.print("page 0");
+        enterNextionCommand();
+        menu.contentShow(0);
+    }
+    else if (page == 1)
+    {
+        enterNextionCommand();
+        Serial.print("page 1");
+        enterNextionCommand();
+
+        initilazePic();
+        menu.focusUp();
+        menu.contentShow(1);
+    }
 }
 
 /* --- UKONCOVACI SEKVENCE ZNAKU PRO DISPLEJ --- */

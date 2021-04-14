@@ -1,8 +1,9 @@
 #pragma once
 #include <EasyNextionLibrary.h>
 #include <Controls/Controls.hpp>
+#include <Display/Menu.h>
 
-#define SETTINGS_COUNT 6
+#define SETTINGS_COUNT 11
 
 #define UNFOCUSED 9
 #define FOCUSED 10
@@ -58,7 +59,7 @@ public:
     int searchForFocused();
     int searchForSelected();
 
-    void contentShow();
+    void contentShow(int page);
     void contentUp();
     void contentDown();
     void displayContentInItem(int item, int content);
@@ -66,7 +67,9 @@ public:
     void IncreseVal();
     void DecreseVal();
 
-    void insertValueIntoTheFreakingSetting(String itemName, int value);
+    void insertValueIntoTheFreakingSetting(String itemName, int numValue, String value);
+    void dispSetInfo(char *content, bool warning);
+    void newLine();
 };
 
 class Display
@@ -77,9 +80,12 @@ public:
     bool switcher;
     int page;
     int activePage;
+
     Display();
 
     void loop(bool up, bool down);
+
+    void setPage(int page);
 
     void dispSetMode(char *content);
     void dispSetDose(char *content);

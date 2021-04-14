@@ -21,6 +21,8 @@ public:
     unsigned short MaxCurrent;
     unsigned short MaxSpeed;
     unsigned int RotationToMl;
+    unsigned int tubeLenght;
+    unsigned int tubeDiameter;
 };
 
 class Parameters
@@ -53,4 +55,7 @@ public:
     long ActuallRotationCount;
     long WantedRotationCount;
     unsigned short ActuallCurrent;
+    bool filledTubes;
+    bool wifiConected;
+    bool MQTTConnected;
 };

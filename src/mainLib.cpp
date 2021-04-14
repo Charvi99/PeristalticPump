@@ -1,33 +1,23 @@
 #include "mainLib.h"
 
-Global::Global()
-{
-    Pump _pump;
-    MQTT _mqtt;
-    Display _disp;
-    Control _control;
 
-    _JSONsettings = "";
-    _JsonData = "";
-}
-/*
-Pump Global::getPump()
+Pump& Global::getPump()
 {
     return _pump;
 }
-MQTT Global::getMQTT()
+MQTT& Global::getMQTT()
 {
     return _mqtt;
 }
-Display Global::getDisplay()
+Display& Global::getDisplay()
 {
     return _disp;
 }
-Control Global::getControl()
+Control& Global::getControl()
 {
     return _control;
 }
-*/
+
 String &Global::getJSONSettings()
 {
     return _JSONsettings;

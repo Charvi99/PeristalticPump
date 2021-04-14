@@ -11,8 +11,15 @@
 #define ENCODER_A 32
 #define ENCODER_B 33
 
-#define START_BTN 26
-#define STOP_BTN 27
+#define SSR_PIN 34
+#define ENABLE_PIN 13
+
+#define DRIVER_ENABLE_PIN 13
+#define GO 1
+#define STOP 0
+
+#define DRIVER_DIRECTION_PIN_CW 12
+#define DRIVER_DIRECTION_PIN_ACW 14
 
 extern Adafruit_INA219 ina219;
 extern ESP32Encoder pumpEncoder;
@@ -43,14 +50,18 @@ public:
     void pumpEnable();
     void pumpDisable();
 
+    void fillTubes();
+
     void setting(String settings);
     void setDose(unsigned short ml);
     void setSpeed(unsigned short speed);
     void setDirection(bool direction);
     void setInterval(unsigned long interval);
     void setRamp(unsigned short time);
-    void setMode(Parameters content);
+    void setMode(unsigned int mode);
 
+    void setTubeLenght(unsigned short current);
+    void setTubeDiameter(unsigned short current);
     void setMaxCurrent(unsigned short current);
     void setMaxSpeed(unsigned short speed);
     unsigned short getMaxCurrent();
