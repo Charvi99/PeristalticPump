@@ -25,6 +25,8 @@ public:
     bool Up;
     bool Down;
 
+    unsigned long infoUpdateTimeMark = 0;
+
     Control();
     void controlSetup();
     void encoderLoop();

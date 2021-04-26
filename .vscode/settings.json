@@ -45,6 +45,7 @@
         "string": "cpp",
         "random": "cpp",
         "bitset": "cpp",
-        "chrono": "cpp"
+        "chrono": "cpp",
+        "future": "cpp"
     }
 }

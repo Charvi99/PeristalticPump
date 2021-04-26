@@ -24,8 +24,7 @@ Control::Control()
 
     pinMode(START_BTN, INPUT_PULLUP);
     pinMode(STOP_BTN, INPUT_PULLUP);
-    pinMode(CONTROL_ENCODER_BTN , INPUT_PULLUP);
-
+    pinMode(CONTROL_ENCODER_BTN, INPUT_PULLUP);
 
     /* --- NASTAVENI OVLADACIHO ENKODERU --- */
     ESP32Encoder::useInternalWeakPullResistors = UP;
@@ -39,7 +38,7 @@ Control::Control()
 /* --- HANDLER PRO TLACITKA --- */
 void buttonReleaseLoop(Button2 &btn)
 {
- if ((btn == mainVariable.getControl().start_btn) && (mainVariable.getPump().parameters.Mode == mainVariable.getPump().parameters.MANUAL))
+    if ((btn == mainVariable.getControl().start_btn) && (mainVariable.getPump().parameters.Mode == mainVariable.getPump().parameters.MANUAL))
     {
         mainVariable.getPump().pumpDisable();
         mainVariable.getPump().stop();
@@ -73,7 +72,6 @@ void buttonPressLoop(Button2 &btn)
         {
             mainVariable.getDisplay().activePage = 1;
             mainVariable.getDisplay().setPage(1);
-    
         }
         /* --- STISKEM ENKODERU V NASTAENI AKTIVUJI FOCUSNUTY PRVEK --- */
         else if (mainVariable.getDisplay().activePage == 1)
@@ -95,7 +93,7 @@ void Control::encoderLoop()
     long currentCount = controlEncoder.getCount();
     if (currentCount != 0 && mainVariable.getDisplay().activePage == 1)
     {
-        if (0 > currentCount)
+        if (0 < currentCount)
         {
             Down = true;
             controlEncoder.clearCount();
@@ -103,7 +101,7 @@ void Control::encoderLoop()
             Serial.print("DOWN =");
             Serial.println(Down);
         }
-        else if (0 < currentCount)
+        else if (0 > currentCount)
         {
             Up = true;
             controlEncoder.clearCount();
@@ -117,30 +115,27 @@ void Control::encoderLoop()
     }
     else if (currentCount != 0 && mainVariable.getDisplay().activePage == 0)
     {
-        if (0 > currentCount)
+        if (0 < currentCount)
         {
             controlEncoder.clearCount();
             Serial.println("ENCODER DOWN");
             Serial.print("DOWN =");
             Serial.println(Down);
 
-            enterNextionCommand();
-            mainVariable.getPump().setSpeed(mainVariable.getDisplay().menu.settings[4].NumValue - 1);
-            enterNextionCommand();
-
+            if (mainVariable.getDisplay().menu.settings[4].NumValue > 1)
+                mainVariable.getPump().setSpeed(mainVariable.getDisplay().menu.settings[4].NumValue - 1);
         }
-        else if (0 < currentCount)
+        else if (0 > currentCount)
         {
             controlEncoder.clearCount();
             Serial.println("ENCODER UP");
             Serial.print("UP =");
             Serial.println(Up);
 
-            enterNextionCommand();
-            mainVariable.getPump().setSpeed(mainVariable.getDisplay().menu.settings[4].NumValue + 1);
-            enterNextionCommand();
-
+            if (mainVariable.getDisplay().menu.settings[4].NumValue < 10)
+                mainVariable.getPump().setSpeed(mainVariable.getDisplay().menu.settings[4].NumValue + 1);
         }
+
         mainVariable.getDisplay().menu.contentShow(0);
     }
 }
@@ -154,7 +149,7 @@ void Control::loop()
 
     encoderLoop();
 
-    if ((mainVariable.getPump().status.Running == false) && (digitalRead(19) == LOW || digitalRead(23) == LOW || digitalRead(18) == LOW || digitalRead(5) == LOW))
+    if ((mainVariable.getPump().isRunning() == false) && (digitalRead(19) == LOW || digitalRead(23) == LOW || digitalRead(18) == LOW || digitalRead(5) == LOW))
     {
         unsigned pom = 0;
         if (digitalRead(19) == LOW)
@@ -169,6 +164,11 @@ void Control::loop()
         mainVariable.getPump().setMode(pom);
         mainVariable.getDisplay().menu.contentShow(0);
     }
-    else if ((mainVariable.getPump().status.Running == true) && (digitalRead(19) == LOW || digitalRead(23) == LOW || digitalRead(18) == LOW || digitalRead(5) == LOW))
+    else if ((mainVariable.getPump().isRunning() == true) && (digitalRead(19) == LOW || digitalRead(23) == LOW || digitalRead(18) == LOW || digitalRead(5) == LOW))
+    {
         mainVariable.getDisplay().dispSetInfo("Pri behu nelze zmenit mod rizeni", false);
+        infoUpdateTimeMark = millis();
+    }
+    if (mainVariable.getDisplay().currentInfo == "Pri behu nelze zmenit mod rizeni" && (millis() - infoUpdateTimeMark > 1000))
+        mainVariable.getDisplay().menu.contentShow(0);
 }

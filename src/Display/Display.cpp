@@ -14,6 +14,40 @@ Display::Display()
     initilazePic();
     menu.contentShow(activePage);
 }
+/* --- HLAVNI SMYCKA PRO DISPLEJ --- */
+void Display::loop(bool up, bool down)
+{
+    //myNex.NextionListen();
+
+    if (activePage == 1)
+    {
+        if (up == true && down == false)
+        {
+            if (menu.searchForSelected() == -1) //nic neni vybrano -> posun v menu
+                menu.focusUp();
+            else ///neco je vybrano -> zmena hodnoty
+                menu.IncreseVal();
+        }
+        else if (down == true && up == false)
+        {
+            if (menu.searchForSelected() == -1) //nic neni vybrano -> posun v menu
+                menu.focusDown();
+            else ///neco je vybrano -> zmena hodnoty
+                menu.DecreseVal();
+        }
+    }
+    else
+    {
+        // if (mainVariable.getPump().isRunning() == true)
+        //{
+        dispSetMl(abs(mainVariable.getPump().getMl()));
+        // }
+
+        dispGraph(map(mainVariable.getPump().getCurrent(), 0, 600, 2, 75));
+        dispRun(mainVariable.getPump().isRunning());
+    }
+}
+
 /* --- ODESLANI DAT NA DISPLEJ --- */
 void Display::dispSetMode(char *content)
 {
@@ -58,6 +92,7 @@ void Display::dispSetInfo(char *content, bool warning)
         myNex.writeNum("info_t.pco", FOCUSED_NAME_PC);
         myNex.writeStr("info_t.txt", content);
     }
+    currentInfo = content;
 }
 void Menu::dispSetInfo(char *content, bool warning)
 {
@@ -78,46 +113,55 @@ void Menu::dispSetInfo(char *content, bool warning)
         myNex.writeNum("info_t.pco", FOCUSED_NAME_PC);
         myNex.writeStr("info_t.txt", content);
     }
+    //mainVariable.getDisplay().currentInfo = content;
 }
 
 void Display::dispSetMl(int content)
 {
     myNex.writeNum("n0.val", content);
+    if (content < 999)
+        myNex.writeStr("t4.txt", "mL");
+    else if (content > 999)
+        myNex.writeStr("t4.txt", "L");
 }
 void Display::dispGraph(int content)
 {
-    myNex.writeNum("graphVal.val", content);
+
+    enterNextionCommand();
+    Serial.print("add 17,0,");
+    Serial.print(content);
+    enterNextionCommand();
+    Serial.print("add 17,1,");
+    Serial.print(content - 1);
+    enterNextionCommand();
+    Serial.print("add 17,2,");
+    Serial.print(content - 2);
+    enterNextionCommand();
+
+    //PO PREHRATI FIRMAVARU BY SE O ZAPISOVANI STARAL INTERNI TIMER DISPLEJE A HODNOTU BYCH VKLADAL DO PROMENNE
+    /* myNex.writeNum("tm0.en",1);
+     myNex.writeNum("tm1.en",1);
+     myNex.writeNum("tm2.en",1);
+     myNex.writeNum("tm3.en",1);
+    myNex.writeNum("graphVal.val", content);*/
 }
 void Display::dispRun(bool content)
 {
     if (content == true)
-        myNex.writeNum("enable.val", 1);
-    else
-        myNex.writeNum("enable.val", 0);
-}
-
-/* --- HLAVNI SMYCKA PRO DISPLEJ --- */
-void Display::loop(bool up, bool down)
-{
-    //myNex.NextionListen();
-
-    if (activePage == 1)
     {
-        if (up == true && down == false)
+        myNex.writeNum("enable.val", 1);
+        if (millis() - lastIconUpdateTimeMark > 300)
         {
-            if (menu.searchForSelected() == -1) //nic neni vybrano -> posun v menu
-                menu.focusUp();
-            else ///neco je vybrano -> zmena hodnoty
-                menu.IncreseVal();
-        }
-        else if (down == true && up == false)
-        {
-            if (menu.searchForSelected() == -1) //nic neni vybrano -> posun v menu
-                menu.focusDown();
-            else ///neco je vybrano -> zmena hodnoty
-                menu.DecreseVal();
+            if (switcher2 == true)
+                myNex.writeNum("p1.pic", 1);
+            else
+                myNex.writeNum("p1.pic", 2);
+            switcher2 = !switcher2;
+            lastIconUpdateTimeMark = millis();
         }
     }
+    else
+        myNex.writeNum("enable.val", 0);
 }
 
 /* --- KONSTRUKTOR PRVKU MENU --- */
@@ -140,11 +184,11 @@ Menu::Menu()
 
     /* --- MANUÁALNI VKLADANI PRVKU DO DISPLEJE --- */
     settings[1] = {"Mode", "MANUAL", 0, ""};
-    settings[2] = {"Dose", "100", 100, "ml"};
+    settings[2] = {"Dose", "50", 50, "ml"};
     settings[3] = {"Direction", "CW", 0, ""};
     settings[4] = {"Speed", "100", 10, "%"};
-    settings[5] = {"Interval", "0", 0, "s"};
-    settings[6] = {"Ramp", "0", 0, "s"};
+    settings[5] = {"Interval", "5", 5, "s"};
+    settings[6] = {"Ramp", "1", 1, "s"};
     settings[7] = {"Tube lenght", "30", 30, "mm"};
     settings[8] = {"Tube diameter", "3", 3, "mm"};
     settings[9] = {"MQTT", "OFF", 0, ""};
@@ -428,7 +472,8 @@ void Menu::IncreseVal()
     }
     else if (settings[index].Name == "Speed")
     {
-        mainVariable.getPump().setSpeed(settings[index].NumValue + 1);
+        if (settings[index].NumValue < 10)
+            mainVariable.getPump().setSpeed(++settings[index].NumValue);
     }
     else if (settings[index].Name == "Interval")
     {
@@ -493,7 +538,8 @@ void Menu::DecreseVal()
         }
         else if (settings[index].Name == "Speed")
         {
-            mainVariable.getPump().setSpeed(settings[index].NumValue - 1);
+            if (settings[index].NumValue > 2)
+                mainVariable.getPump().setSpeed(--settings[index].NumValue);
         }
         else if (settings[index].Name == "Interval")
         {

@@ -11,8 +11,7 @@
 #define ENCODER_A 32
 #define ENCODER_B 33
 
-#define SSR_PIN 34
-#define ENABLE_PIN 13
+#define SSR_PIN 2
 
 #define DRIVER_ENABLE_PIN 13
 #define GO 1
@@ -20,6 +19,9 @@
 
 #define DRIVER_DIRECTION_PIN_CW 12
 #define DRIVER_DIRECTION_PIN_ACW 14
+
+#define MIN_DUTY 180
+#define MAX_DUTY 254
 
 extern Adafruit_INA219 ina219;
 extern ESP32Encoder pumpEncoder;
@@ -35,7 +37,11 @@ public:
 
     Adafruit_INA219 ina219;
     ESP32Encoder pumpEncoder;
-
+    unsigned long lastInterval = 0;
+    unsigned short currentDuty = 0;
+    double currentSpeed = 0;
+    double speedIncrement = 0;
+    unsigned long lastSpeedIncrementTimeMark = 0;
     Pump();
     void setup();
 
@@ -46,6 +52,7 @@ public:
     void runDose();
     void runIntervalDose();
     void stop();
+    void rampSpeedAdjustment();
 
     void pumpEnable();
     void pumpDisable();
@@ -68,7 +75,6 @@ public:
     unsigned short getMaxSpeed();
     bool isRunning();
 
-    void IRAM_ATTR measurementLoop();
     void updateSensor();
     float getCurrent();
     long getRotation();

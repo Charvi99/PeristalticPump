@@ -1,15 +1,19 @@
 #pragma once
 #include "Pump.h"
 
+#define COUNT_OF_SAMPLES 5
+
 class Sensor
 {
 public:
     Sensor();
     float shuntvoltage;
     float busvoltage;
-    float current_mA;
+    float rawCurrent_mA;
     float loadvoltage;
     float power_mW;
+    float rawCurrentArray[COUNT_OF_SAMPLES];
+    float smoothCurrent_mA;
 };
 
 class Settings
@@ -54,8 +58,9 @@ public:
     bool Running;
     long ActuallRotationCount;
     long WantedRotationCount;
-    unsigned short ActuallCurrent;
+    unsigned short ActuallRawCurrent;
     bool filledTubes;
     bool wifiConected;
     bool MQTTConnected;
+    long duty;
 };

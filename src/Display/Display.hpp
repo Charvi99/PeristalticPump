@@ -2,6 +2,7 @@
 #include <EasyNextionLibrary.h>
 #include <Controls/Controls.hpp>
 #include <Display/Menu.h>
+#include <mainLib.h>
 
 #define SETTINGS_COUNT 11
 
@@ -37,7 +38,7 @@ public:
     {
         String Name;
         String Value;
-        int NumValue;
+        unsigned short NumValue;
         String Unit;
     };
 
@@ -80,7 +81,9 @@ public:
     bool switcher;
     int page;
     int activePage;
-
+    char *currentInfo = "";
+    bool switcher2 = false;
+    unsigned long lastIconUpdateTimeMark = 0;
     Display();
 
     void loop(bool up, bool down);

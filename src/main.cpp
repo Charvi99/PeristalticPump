@@ -1,23 +1,8 @@
 #include <mainLib.h>
-#include <Tone32.h>
-#include <Freenove_WS2812_Lib_for_ESP32.h>
+
 #include <driver/adc.h>
 
-#define BUZZER_PIN 26
-#define BUZZER_CHANNEL 0
-#define SESNACT 190
-#define OSMIN 375
-#define CTVRT 750
-#define PUL 1500
-#define CELA 3000
-
-#define LEDS_COUNT 16
-#define LEDS_PIN 25
-#define CHANNEL 0
-
-Freenove_ESP32_WS2812 strip = Freenove_ESP32_WS2812(LEDS_COUNT, LEDS_PIN, CHANNEL);
-
-Global mainVariable(new Pump(), new MQTT(), new Display(), new Control());
+Global mainVariable(new Pump(), new MQTT(), new Display(), new Control(), new Alarm());
 
 /* --- JEDNOTLIVE SUBRUTINY --- */
 COROUTINE(MotorCoroutine)
@@ -25,7 +10,7 @@ COROUTINE(MotorCoroutine)
     COROUTINE_LOOP()
     {
         mainVariable.getPump().loop();
-        //pumpa->loop();
+        //COROUTINE_DELAY(15);
         COROUTINE_YIELD();
     }
 }
@@ -45,6 +30,8 @@ COROUTINE(DisplayComunicationRoutine)
     {
         mainVariable.getDisplay().loop(false, false);
         //disp->loop(false, false);
+        if (mainVariable.getDisplay().activePage == 0)
+            COROUTINE_DELAY(150);
         COROUTINE_YIELD();
     }
 }
@@ -53,8 +40,8 @@ COROUTINE(AlarmRoutine)
     COROUTINE_LOOP()
     {
         // ====== SOVIET HYMNA ======
+        //tone(BUZZER_PIN, NOTE_C5, CTVRT, BUZZER_CHANNEL);
         /*
-        tone(BUZZER_PIN, NOTE_C5, CTVRT, BUZZER_CHANNEL);
         noTone(BUZZER_PIN, BUZZER_CHANNEL);
         tone(BUZZER_PIN, NOTE_G4, OSMIN, BUZZER_CHANNEL);
         noTone(BUZZER_PIN, BUZZER_CHANNEL);
@@ -120,9 +107,8 @@ COROUTINE(AlarmRoutineLED)
             strip.show();
             delay(5);
         }*/
-
-        //Serial.println(mainVariable.getPump().getCurrent());
-
+        //mainVariable.getPump().getCurrent();
+        COROUTINE_DELAY(150);
 
         COROUTINE_YIELD();
     }
@@ -147,14 +133,21 @@ void setup()
     //Serial.println("MQTT should work");
 
     pinMode(36, OUTPUT);
-    pinMode(2, OUTPUT);
+    //pinMode(2, OUTPUT);
     pinMode(15, INPUT_PULLUP);
 
     pinMode(12, OUTPUT);
     pinMode(13, OUTPUT);
 
     CoroutineScheduler::setup();
-    strip.begin();
+
+    ledcSetup(0, 1000, 8);
+    ledcAttachPin(DRIVER_ENABLE_PIN, 0);
+
+    digitalWrite(SSR_PIN, GO);
+    delay(1000);
+    digitalWrite(SSR_PIN, STOP);
+
 }
 
 /* --- SEKVENCNI VYKONAVANI SUBRUTIN --- */
@@ -185,5 +178,4 @@ void loop()
     }
     else if (test > 2)*/
     CoroutineScheduler::loop();
-    //delay(5);
 }

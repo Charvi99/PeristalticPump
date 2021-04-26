@@ -6,23 +6,7 @@
 
 Pump::Pump()
 {
-    pinMode(settings.Pin, OUTPUT);
-
-    if (!ina219.begin())
-        Serial.println("Failed to find INA219 chip");
-
-    ESP32Encoder::useInternalWeakPullResistors = UP;
-    pumpEncoder.attachHalfQuad(ENCODER_A, ENCODER_B);
-    pumpEncoder.clearCount();
-    ina219.setCalibration_32V_2A();
-
     pinMode(SSR_PIN, OUTPUT);
-    analogWrite(SSR_PIN, 255);
-    stop();
-}
-void Pump::setup()
-{
-    pinMode(settings.Pin, OUTPUT);
 
     if (!ina219.begin())
         Serial.println("Failed to find INA219 chip");
@@ -31,13 +15,18 @@ void Pump::setup()
     pumpEncoder.attachHalfQuad(ENCODER_A, ENCODER_B);
     pumpEncoder.clearCount();
     ina219.setCalibration_32V_2A();
+
+    ledcSetup(0, 60000, 8);
+    ledcAttachPin(DRIVER_ENABLE_PIN, 0);
+
+    stop();
 }
 
 /* --- HLAVNI SMYCKA PUMPY --- */
 void Pump::loop()
 {
     setting(mainVariable.getJSONSettings());
-    //settings.MaxSpeed++;
+
     if (mainVariable.getPump().status.Enable == true)
         run();
     else
@@ -67,15 +56,32 @@ void Pump::run()
     }
 }
 
+/* --- ALGORITMUS RAMPY --- */
+void Pump::rampSpeedAdjustment()
+{
+    if (isRunning() == false)
+    {
+        if (parameters.RampTime > 0)
+            speedIncrement = parameters.Speed / (parameters.RampTime * 10);
+        else
+            currentDuty = map(parameters.Speed, 0, 100, MIN_DUTY, MAX_DUTY);
+        lastSpeedIncrementTimeMark = millis();
+    }
+    else if ((millis() - lastSpeedIncrementTimeMark > 100) && (currentDuty < (map(parameters.Speed, 0, 100, MIN_DUTY, MAX_DUTY))))
+    {
+        currentSpeed += speedIncrement;
+        currentDuty = map(currentSpeed, 0, 100, MIN_DUTY, MAX_DUTY);
+        lastSpeedIncrementTimeMark = millis();
+    }
+}
 /* --- PLNE MANUALNI MOD VYZADUJE DRZENI TL. START --- */
 void Pump::runManual()
 {
-    //Serial.println("Manual Running");
-    //analogWrite(settings.Pin, parameters.Speed, parameters.Speed);
-    digitalWrite(DRIVER_ENABLE_PIN, GO);
+    rampSpeedAdjustment();
+    ledcWrite(0, currentDuty);
+
     digitalWrite(DRIVER_DIRECTION_PIN_CW, !parameters.Direction);
     digitalWrite(DRIVER_DIRECTION_PIN_ACW, parameters.Direction);
-    Serial.println("Jedu MANUAL");
 
     status.Running = true;
 }
@@ -83,11 +89,11 @@ void Pump::runManual()
 /* --- SEMIMANUALNI MOD ZAPNE DAVKOVANI STIKEM TL. START, VYPNE JEJ STISKEM TL. STOP --- */
 void Pump::runSemiManual()
 {
-    //analogWrite(settings.Pin, parameters.Speed, parameters.Speed);
-    digitalWrite(DRIVER_ENABLE_PIN, GO);
+    rampSpeedAdjustment();
+    ledcWrite(0, currentDuty);
+
     digitalWrite(DRIVER_DIRECTION_PIN_CW, !parameters.Direction);
     digitalWrite(DRIVER_DIRECTION_PIN_ACW, parameters.Direction);
-    Serial.println("Jedu SEMIMANUAL");
 
     status.Running = true;
 }
@@ -97,22 +103,49 @@ void Pump::runDose()
 {
     if (status.Running == false)
         status.WantedRotationCount = parameters.Dose * settings.RotationToMl;
-    status.Running = true;
-    analogWrite(settings.Pin, parameters.Speed, parameters.Speed);
 
-    if (getRotation() >= status.WantedRotationCount)
+    if (abs(getRotation()) >= status.WantedRotationCount)
         stop();
+    else
+    {
+        rampSpeedAdjustment();
+        ledcWrite(0, currentDuty);
+
+        digitalWrite(DRIVER_DIRECTION_PIN_CW, !parameters.Direction);
+        digitalWrite(DRIVER_DIRECTION_PIN_ACW, parameters.Direction);
+        status.Running = true;
+    }
 }
 
 /* --- INTERVALOVY MOD PO STISKU TL. START ZAPOCNE CYKLUS PRENESENI */
 /*  POZADOVANEHO OBJEMU, KTERY OPAKUJE PO UPLYNUTI NASTAVENE DOBY --- */
 void Pump::runIntervalDose()
 {
-    //Serial.println("interval Running");
-    long cycleNumber = parameters.Dose * settings.RotationToMl;
-    for (size_t i = 0; i < cycleNumber; i++)
+    if (currentDuty == 0)
     {
-        /* code */
+        status.WantedRotationCount = parameters.Dose * settings.RotationToMl;
+        lastInterval = 0;
+    }
+
+    if (millis() > (lastInterval + (parameters.Interval * 1000)))
+    {
+        if (abs(getRotation()) >= (parameters.Dose * settings.RotationToMl))
+        {
+            resetRotation();
+            lastInterval = millis();
+            status.Running = false;
+            currentSpeed = 0;
+            currentDuty = 1;
+        }
+        else
+        {
+            rampSpeedAdjustment();
+            ledcWrite(0, currentDuty);
+
+            digitalWrite(DRIVER_DIRECTION_PIN_CW, !parameters.Direction);
+            digitalWrite(DRIVER_DIRECTION_PIN_ACW, parameters.Direction);
+            status.Running = true;
+        }
     }
 }
 
@@ -121,21 +154,25 @@ void Pump::stop()
 {
     status.Running = false;
     status.Enable = false;
-    analogWrite(SSR_PIN, 0);
+    currentSpeed = 0;
+    currentDuty = 0;
     digitalWrite(DRIVER_ENABLE_PIN, STOP);
-    digitalWrite(DRIVER_DIRECTION_PIN_CW, HIGH);
-    digitalWrite(DRIVER_DIRECTION_PIN_CW, LOW);
-    Serial.println("Prave ted by mela byt pumpa vypnuta");
+
+    resetRotation();
+    //ledcWrite(0, 256);
+
+    //Serial.println("Prave ted by mela byt pumpa vypnuta");
 }
 
 /* --- VYPNUTI/ZAPNUTI PUMPY --- */
 void Pump::pumpEnable()
 {
+    digitalWrite(SSR_PIN, GO);
     status.Enable = true;
-    analogWrite(SSR_PIN, 255);
 }
 void Pump::pumpDisable()
 {
+    digitalWrite(SSR_PIN, STOP);
     stop();
     status.Enable = false;
 }
@@ -212,10 +249,22 @@ void Pump::setDose(unsigned short content)
 
 void Pump::setSpeed(unsigned short content)
 {
-    if (content < 10)
-        if (content < settings.MaxSpeed)
-            parameters.Speed = content * 10;
-    mainVariable.getDisplay().menu.insertValueIntoTheFreakingSetting("Speed", content, String(content * 10));
+    if (content > 0)
+    {
+        if (content < 10)
+        {
+            if (content < 1)
+                parameters.Speed = 10;
+            else
+                parameters.Speed = content * 10;
+        }
+        else
+        {
+            parameters.Speed = 100;
+        }
+    }
+
+    mainVariable.getDisplay().menu.insertValueIntoTheFreakingSetting("Speed", content, String(parameters.Speed));
 }
 
 void Pump::setDirection(bool content)
@@ -311,38 +360,57 @@ bool Pump::isRunning()
     return status.Running;
 }
 
-/* --- SMYCKA PRO MERENI PROUDU (POPR DALSICH HODNOT) --- */
-void Pump::measurementLoop()
-{
-    //Serial.println("Measurement Running");
-
-    float current = getCurrent();
-    //Serial.println(current);
-    /*        
-        Serial.print("Proud: ");
-        Serial.print(current);
-        Serial.println(" [mA]");
-        Serial.print("Otacky: ");
-        Serial.print(getRotation());
-        Serial.println(" [rot]");
-        Serial.println();
-    */
-}
 
 /* --- METODY NACITAJICI HODNOTY ZE SENZORU PROUDU A OTACEK --- */
 void Pump::updateSensor()
 {
     sensor.shuntvoltage = ina219.getShuntVoltage_mV();
     sensor.busvoltage = ina219.getBusVoltage_V();
-    sensor.current_mA = ina219.getCurrent_mA();
+    sensor.rawCurrent_mA = ina219.getCurrent_mA();
     sensor.power_mW = ina219.getPower_mW();
     sensor.loadvoltage = sensor.busvoltage + (sensor.shuntvoltage / 1000);
 }
 float Pump::getCurrent()
 {
     Pump::updateSensor();
-    status.ActuallCurrent = sensor.current_mA;
-    return sensor.current_mA;
+    status.ActuallRawCurrent = sensor.rawCurrent_mA;
+    sensor.rawCurrentArray[COUNT_OF_SAMPLES - 1] = sensor.rawCurrent_mA;
+    float avrageOfCurrent = 0;
+
+    for (size_t i = 0; i < COUNT_OF_SAMPLES; i++)
+        avrageOfCurrent += sensor.rawCurrentArray[i];
+    for (size_t i = 0; i < COUNT_OF_SAMPLES - 1; i++)
+        sensor.rawCurrentArray[i] = sensor.rawCurrentArray[i + 1];
+
+    sensor.smoothCurrent_mA = avrageOfCurrent / COUNT_OF_SAMPLES;
+
+    //Serial.print("RAW Current: ");
+    Serial.print(ina219.getCurrent_mA()); //raw current
+    Serial.print(",");
+
+    /*Serial.print("RAW Array: [");
+    for (size_t i = 0; i < COUNT_OF_SAMPLES - 1; i++)
+    {
+        Serial.print(sensor.rawCurrentArray[i]);
+        Serial.print("");
+    }
+    Serial.println("]");*/
+
+    //Serial.print("Smooth Current: ");
+    /* Serial.println(sensor.smoothCurrent_mA); //smooth current
+    long currentToSend = map(sensor.smoothCurrent_mA, 0, 600, 0, 75);
+    enterNextionCommand();
+    Serial.print("add 17,0,");
+    Serial.print(currentToSend);
+    enterNextionCommand();
+    Serial.print("add 17,1,");
+    Serial.print(currentToSend - 1);
+    enterNextionCommand();
+    Serial.print("add 17,2,");
+    Serial.print(currentToSend - 2);
+    enterNextionCommand();
+*/
+    return sensor.smoothCurrent_mA;
 }
 long Pump::getRotation()
 {
