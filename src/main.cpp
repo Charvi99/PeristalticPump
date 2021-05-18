@@ -3,9 +3,10 @@
 #include <driver/adc.h>
 
 Global mainVariable(new Pump(), new MQTT(), new Display(), new Control(), new Alarm());
+//Freenove_ESP32_WS2812 strip = Freenove_ESP32_WS2812(LEDS_COUNT, LEDS_PIN, CHANNEL);
 
 /* --- JEDNOTLIVE SUBRUTINY --- */
-COROUTINE(MotorCoroutine)
+COROUTINE(PumpCoroutine)
 {
     COROUTINE_LOOP()
     {
@@ -29,9 +30,15 @@ COROUTINE(DisplayComunicationRoutine)
     COROUTINE_LOOP()
     {
         mainVariable.getDisplay().loop(false, false);
-        //disp->loop(false, false);
         if (mainVariable.getDisplay().activePage == 0)
-            COROUTINE_DELAY(150);
+        {
+            if ((millis() - mainVariable.getLastAlerUpdate()) > 5000)
+            {
+                mainVariable.getDisplay().menu.contentShow(0);
+            }
+            COROUTINE_DELAY(200);
+        }
+        mainVariable.getDisplay().myNex.NextionListen();
         COROUTINE_YIELD();
     }
 }
@@ -91,35 +98,17 @@ COROUTINE(AlarmRoutine)
         tone(BUZZER_PIN, NOTE_G4, OSMIN, BUZZER_CHANNEL);
         noTone(BUZZER_PIN, BUZZER_CHANNEL);
 */
+        mainVariable.getAlarm().alarmLoop();
         COROUTINE_YIELD();
     }
 }
-COROUTINE(AlarmRoutineLED)
-{
-    COROUTINE_LOOP()
-    {
-        /* for (int j = 0; j < 255; j += 2)
-        {
-            for (int i = 0; i < LEDS_COUNT; i++)
-            {
-                strip.setLedColorData(i, strip.Wheel((i * 256 / LEDS_COUNT + j) & 255));
-            }
-            strip.show();
-            delay(5);
-        }*/
-        //mainVariable.getPump().getCurrent();
-        COROUTINE_DELAY(150);
 
-        COROUTINE_YIELD();
-    }
-}
 COROUTINE(MQTTComunicationRoutine)
 {
     COROUTINE_LOOP()
     {
         COROUTINE_AWAIT(WiFi.status() == WL_CONNECTED);
         mainVariable.getMQTT().loop();
-        //mqtt->loop();
         COROUTINE_YIELD();
     }
 }
@@ -128,26 +117,40 @@ COROUTINE(MQTTComunicationRoutine)
 void setup()
 {
     Serial.begin(115200);
-    //Serial.println("Let's setup MQTT");
-    //mainVariable.getMQTT().MQTTbegin();
-    //Serial.println("MQTT should work");
+    mainVariable.getAlarm().strip.setBrightness(80);
+    for (size_t i = 0; i < 3; i++)
+    {
+        mainVariable.getAlarm().showRun();
+        tone(BUZZER_PIN, NOTE_C3, 350, BUZZER_CHANNEL);
+        noTone(BUZZER_PIN, BUZZER_CHANNEL);
+        mainVariable.getAlarm().shutDownLED();
+        delay(350);
+    }
+
+    Serial.println("Let's setup MQTT");
+    mainVariable.getMQTT().MQTTbegin();
+    Serial.println("MQTT should work");
 
     pinMode(36, OUTPUT);
-    //pinMode(2, OUTPUT);
+    //pinMode(5, OUTPUT);
     pinMode(15, INPUT_PULLUP);
 
-    pinMode(12, OUTPUT);
-    pinMode(13, OUTPUT);
+    pinMode(DRIVER_DIRECTION_PIN_CW, OUTPUT);
+    pinMode(DRIVER_DIRECTION_PIN_ACW, OUTPUT);
 
-    CoroutineScheduler::setup();
+    //strip.begin();
 
     ledcSetup(0, 1000, 8);
     ledcAttachPin(DRIVER_ENABLE_PIN, 0);
 
-    digitalWrite(SSR_PIN, GO);
-    delay(1000);
-    digitalWrite(SSR_PIN, STOP);
+    mainVariable.getPump().ina219.begin();
+    mainVariable.getPump().ina219.setCalibration_32V_2A();
 
+    mainVariable.getDisplay().activePage = 0;
+    mainVariable.getDisplay().setPage(0);
+    mainVariable.getDisplay().menu.contentShow(0);
+
+    CoroutineScheduler::setup();
 }
 
 /* --- SEKVENCNI VYKONAVANI SUBRUTIN --- */
@@ -158,24 +161,41 @@ int readLightSensor()
     adc1_config_channel_atten(ADC1_CHANNEL_0, ADC_ATTEN_DB_11); //ADC_ATTEN_DB_11 = 0-3,6V
     return adc1_get_raw(ADC1_CHANNEL_0);                        //Read analog
 }
-int test = 0;
+int test = 3;
 void loop()
 {
-    /* if (test <= 1)
-    {
-
-        digitalWrite(DRIVER_ENABLE_PIN, GO);
+    if (test < 3)
+    { /*
         digitalWrite(DRIVER_DIRECTION_PIN_CW, HIGH);
-        digitalWrite(DRIVER_DIRECTION_PIN_CW, LOW);
+        digitalWrite(DRIVER_DIRECTION_PIN_ACW, LOW);
+        ledcWrite(0, 254);
         delay(1000);
 
-        digitalWrite(DRIVER_ENABLE_PIN, STOP);
         digitalWrite(DRIVER_DIRECTION_PIN_CW, HIGH);
+        digitalWrite(DRIVER_DIRECTION_PIN_ACW, LOW);
+        ledcWrite(0, 0);
+        delay(500);
+
         digitalWrite(DRIVER_DIRECTION_PIN_CW, LOW);
+        digitalWrite(DRIVER_DIRECTION_PIN_ACW, HIGH);
+        ledcWrite(0, 254);
         delay(1000);
 
+        digitalWrite(DRIVER_DIRECTION_PIN_CW, LOW);
+        digitalWrite(DRIVER_DIRECTION_PIN_ACW, HIGH);
+        ledcWrite(0, 0);
+        delay(500);
+*/
+        digitalWrite(5, HIGH);
+        delay(1500);
+        digitalWrite(5, LOW);
+        delay(500);
         test++;
     }
-    else if (test > 2)*/
-    CoroutineScheduler::loop();
+    else
+    {
+        CoroutineScheduler::loop();
+        AsyncElegantOTA.loop();
+    }
+
 }

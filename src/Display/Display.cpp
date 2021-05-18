@@ -13,6 +13,7 @@ Display::Display()
 
     initilazePic();
     menu.contentShow(activePage);
+    dispSetMl(0);
 }
 /* --- HLAVNI SMYCKA PRO DISPLEJ --- */
 void Display::loop(bool up, bool down)
@@ -24,26 +25,43 @@ void Display::loop(bool up, bool down)
         if (up == true && down == false)
         {
             if (menu.searchForSelected() == -1) //nic neni vybrano -> posun v menu
-                menu.focusUp();
+                menu.focusDown();
             else ///neco je vybrano -> zmena hodnoty
                 menu.IncreseVal();
+            lastInteractionTimeMark = millis();
         }
         else if (down == true && up == false)
         {
             if (menu.searchForSelected() == -1) //nic neni vybrano -> posun v menu
-                menu.focusDown();
+                menu.focusUp();
             else ///neco je vybrano -> zmena hodnoty
                 menu.DecreseVal();
+            lastInteractionTimeMark = millis();
+        }
+        if ((millis() - lastInteractionTimeMark > 10000))
+        {
+            for (size_t i = 0; i < 4; i++)
+                menu.Items[i].Selected = false;
+            activePage = 0;
+            setPage(0);
+            menu.contentShow(0);
         }
     }
     else
     {
         // if (mainVariable.getPump().isRunning() == true)
         //{
-        dispSetMl(abs(mainVariable.getPump().getMl()));
+        dispSetMl(mainVariable.getPump().getMl());
         // }
-
-        dispGraph(map(mainVariable.getPump().getCurrent(), 0, 600, 2, 75));
+        float actualCurrent = mainVariable.getPump().getCurrent();
+        dispGraph(map(actualCurrent, 0, 600, 2, 75));
+        //VAZNE MERIM PROUD TADY???
+        if (actualCurrent > 370)
+        {
+            mainVariable.getPump().pumpDisable();
+            mainVariable.alarmStatus = 3;
+            mainVariable.getDisplay().dispSetInfo("HIGH CURRENT CHECK  TUBES", true);
+        }
         dispRun(mainVariable.getPump().isRunning());
     }
 }
@@ -91,8 +109,12 @@ void Display::dispSetInfo(char *content, bool warning)
         myNex.writeNum("info_t.bco", FOCUSED_NAME_BC);
         myNex.writeNum("info_t.pco", FOCUSED_NAME_PC);
         myNex.writeStr("info_t.txt", content);
+        mainVariable.alarmStatus = (int)Alarm::AlarmStatus::WARNING;
     }
     currentInfo = content;
+    mainVariable.getAlert() = content;
+    mainVariable.getAlertPriority() = warning;
+    mainVariable.getLastAlerUpdate() = millis();
 }
 void Menu::dispSetInfo(char *content, bool warning)
 {
@@ -112,11 +134,14 @@ void Menu::dispSetInfo(char *content, bool warning)
         myNex.writeNum("info_t.bco", FOCUSED_NAME_BC);
         myNex.writeNum("info_t.pco", FOCUSED_NAME_PC);
         myNex.writeStr("info_t.txt", content);
+        mainVariable.alarmStatus = (int)Alarm::AlarmStatus::WARNING;
     }
-    //mainVariable.getDisplay().currentInfo = content;
+    mainVariable.getAlert() = content;
+    mainVariable.getAlertPriority() = INFO_STATUS_IDLE;
+    mainVariable.getLastAlerUpdate() = millis();
 }
 
-void Display::dispSetMl(int content)
+void Display::dispSetMl(long content)
 {
     myNex.writeNum("n0.val", content);
     if (content < 999)
@@ -128,15 +153,28 @@ void Display::dispGraph(int content)
 {
 
     enterNextionCommand();
-    Serial.print("add 17,0,");
-    Serial.print(content);
+    myNex.writeNum("graphVal.val", content);
     enterNextionCommand();
-    Serial.print("add 17,1,");
-    Serial.print(content - 1);
-    enterNextionCommand();
-    Serial.print("add 17,2,");
-    Serial.print(content - 2);
-    enterNextionCommand();
+
+    if (mainVariable.getMQTT().client.connected() == true)
+    {
+        DynamicJsonDocument dataToSend(256);
+
+        dataToSend[0]["Name"] = "Current";
+        dataToSend[0]["Value"] = content;
+        dataToSend[0]["Unit"] = "mA";
+
+        dataToSend[1]["Name"] = "Flow";
+        dataToSend[1]["Value"] = mainVariable.getPump().getMl();
+        if (abs(mainVariable.getPump().getMl()) < 1000)
+            dataToSend[1]["Unit"] = "mL";
+        else
+            dataToSend[1]["Unit"] = "L";
+
+        String dataToSendString = "";
+        serializeJson(dataToSend, dataToSendString);
+        mainVariable.getMQTT().publish("peristaltic/data", dataToSendString.c_str());
+    }
 
     //PO PREHRATI FIRMAVARU BY SE O ZAPISOVANI STARAL INTERNI TIMER DISPLEJE A HODNOTU BYCH VKLADAL DO PROMENNE
     /* myNex.writeNum("tm0.en",1);
@@ -147,21 +185,37 @@ void Display::dispGraph(int content)
 }
 void Display::dispRun(bool content)
 {
-    if (content == true)
+    if (content)
     {
-        myNex.writeNum("enable.val", 1);
         if (millis() - lastIconUpdateTimeMark > 300)
         {
-            if (switcher2 == true)
-                myNex.writeNum("p1.pic", 1);
+            if (mainVariable.getPump().parameters.Direction)
+            {
+                if (switcher2 == true)
+                    myNex.writeNum("p1.pic", 1);
+                else
+                    myNex.writeNum("p1.pic", 2);
+            }
             else
-                myNex.writeNum("p1.pic", 2);
+            {
+                if (switcher2 == true)
+                    myNex.writeNum("p1.pic", 14);
+                else
+                    myNex.writeNum("p1.pic", 15);
+            }
             switcher2 = !switcher2;
             lastIconUpdateTimeMark = millis();
         }
+
+        //myNex.writeNum("directionVal.val", mainVariable.getPump().parameters.Direction);
     }
     else
-        myNex.writeNum("enable.val", 0);
+    {
+        if (mainVariable.getPump().parameters.Direction)
+            myNex.writeNum("p1.pic", 1);
+        else
+            myNex.writeNum("p1.pic", 14);
+    }
 }
 
 /* --- KONSTRUKTOR PRVKU MENU --- */
@@ -191,7 +245,7 @@ Menu::Menu()
     settings[6] = {"Ramp", "1", 1, "s"};
     settings[7] = {"Tube lenght", "30", 30, "mm"};
     settings[8] = {"Tube diameter", "3", 3, "mm"};
-    settings[9] = {"MQTT", "OFF", 0, ""};
+    settings[9] = {"MQTT", "ON", 1, ""};
 
     for (size_t i = 0; i < 4; i++)
         Items[i].storedItem = i;
@@ -325,11 +379,11 @@ void Menu::deselectFocused()
     if (mainVariable.getMQTT().client.connected())
     {
         DynamicJsonDocument settingsToSend(1024);
-        for (size_t i = 0; i < SETTINGS_COUNT; i++)
+        for (size_t i = 1; i < SETTINGS_COUNT; i++)
         {
-            settingsToSend[i]["Name"] = settings[i].Name;
-            settingsToSend[i]["Value"] = settings[i].Value;
-            settingsToSend[i]["Unit"] = settings[i].Unit;
+            settingsToSend[i - 1]["Name"] = settings[i].Name;
+            settingsToSend[i - 1]["Value"] = settings[i].NumValue;
+            settingsToSend[i - 1]["Unit"] = settings[i].Unit;
         }
         String settingsToSendString = "";
         serializeJson(settingsToSend, settingsToSendString);
@@ -354,9 +408,9 @@ void Menu::contentShow(int page)
         }
         else if (settings[1].NumValue == 2)
         {
-            infoText += settings[4].Name + ": " + settings[4].Value + " [" + settings[4].Unit + "]" + "\r" + "\n";
             infoText += settings[2].Name + ": " + settings[2].Value + " [" + settings[2].Unit + "]" + "\r" + "\n";
             infoText += settings[6].Name + ": " + settings[6].Value + " [" + settings[6].Unit + "]" + "\r" + "\n";
+            infoText += settings[4].Name + ": " + settings[4].Value + " [" + settings[4].Unit + "]" + "\r" + "\n";
             infoText += settings[9].Name + ": " + settings[9].Value + " [-]" + "\r" + "\n";
         }
         else if (settings[1].NumValue == 3)
@@ -450,11 +504,12 @@ void Menu::IncreseVal()
         if (settings[index].NumValue > 4)
             settings[index].NumValue = 1;
 
-        mainVariable.getPump().setMode((settings[index].NumValue++));
+        mainVariable.getPump().setMode((++settings[index].NumValue));
     }
     else if (settings[index].Name == "Dose")
     {
-        mainVariable.getPump().setMode(settings[index].NumValue + 1);
+        settings[index].NumValue += 10;
+        mainVariable.getPump().setDose(settings[index].NumValue);
     }
     else if (settings[index].Name == "Direction")
     {
@@ -477,19 +532,19 @@ void Menu::IncreseVal()
     }
     else if (settings[index].Name == "Interval")
     {
-        mainVariable.getPump().setInterval(settings[index].NumValue + 1);
+        mainVariable.getPump().setInterval(++settings[index].NumValue);
     }
     else if (settings[index].Name == "Ramp")
     {
-        mainVariable.getPump().setRamp(settings[index].NumValue + 1);
+        mainVariable.getPump().setRamp(++settings[index].NumValue);
     }
     else if (settings[index].Name == "Tube lenght")
     {
-        mainVariable.getPump().setTubeLenght(settings[index].NumValue++);
+        mainVariable.getPump().setTubeLenght(++settings[index].NumValue);
     }
     else if (settings[index].Name == "Tube diameter")
     {
-        mainVariable.getPump().setTubeDiameter(settings[index].NumValue++);
+        mainVariable.getPump().setTubeDiameter(++settings[index].NumValue);
     }
     else if (settings[index].Name == "MQTT")
     {
@@ -517,11 +572,14 @@ void Menu::DecreseVal()
             if (settings[index].NumValue <= 1)
                 settings[index].NumValue = 4;
 
-            mainVariable.getPump().setMode((settings[index].NumValue--));
+            mainVariable.getPump().setMode((--settings[index].NumValue));
         }
         else if (settings[index].Name == "Dose")
         {
-            mainVariable.getPump().setMode(settings[index].NumValue - 1);
+            if (settings[index].NumValue > 10)
+                settings[index].NumValue -= 10;
+            mainVariable.getPump().setDose(settings[index].NumValue);
+            insertValueIntoTheFreakingSetting(settings[index].Name, settings[index].NumValue, String(settings[index].NumValue));
         }
         else if (settings[index].Name == "Direction")
         {
@@ -543,19 +601,23 @@ void Menu::DecreseVal()
         }
         else if (settings[index].Name == "Interval")
         {
-            mainVariable.getPump().setInterval(settings[index].NumValue - 1);
+            if (settings[index].NumValue > 2)
+                mainVariable.getPump().setInterval(--settings[index].NumValue);
         }
         else if (settings[index].Name == "Ramp")
         {
-            mainVariable.getPump().setRamp(settings[index].NumValue - 1);
+            if (settings[index].NumValue > 1)
+                mainVariable.getPump().setRamp(--settings[index].NumValue);
         }
         else if (settings[index].Name == "Tube lenght")
         {
-            mainVariable.getPump().setTubeLenght(settings[index].NumValue--);
+            if (settings[index].NumValue > 1)
+                mainVariable.getPump().setTubeLenght(--settings[index].NumValue);
         }
         else if (settings[index].Name == "Tube diameter")
         {
-            mainVariable.getPump().setTubeDiameter(settings[index].NumValue--);
+            if (settings[index].NumValue > 1)
+                mainVariable.getPump().setTubeDiameter(--settings[index].NumValue);
         }
         else if (settings[index].Name == "MQTT")
         {
@@ -628,4 +690,114 @@ void enterNextionCommand()
     Serial.write(0xff);
     Serial.write(0xff);
     Serial.write(0xff);
+}
+
+void trigger1()
+{
+    if (!mainVariable.getPump().isRunning())
+        mainVariable.getPump().resetRotation();
+    else
+        mainVariable.getDisplay().dispSetInfo("Counter can't be nullify when pump is running", true);
+}
+
+void trigger2()
+{
+    if (!mainVariable.getPump().isRunning())
+    {
+        bool set = mainVariable.getPump().parameters.Direction;
+        mainVariable.getPump().setDirection(!set);
+        mainVariable.getDisplay().menu.contentShow(0);
+
+        if (mainVariable.getMQTT().client.connected())
+        {
+            DynamicJsonDocument settingsToSend(1024);
+            for (size_t i = 0; i < SETTINGS_COUNT - 1; i++)
+            {
+                settingsToSend[i]["Name"] = mainVariable.getDisplay().menu.settings[i + 1].Name;
+                settingsToSend[i]["Value"] = mainVariable.getDisplay().menu.settings[i + 1].NumValue;
+                settingsToSend[i]["Unit"] = mainVariable.getDisplay().menu.settings[i + 1].Unit;
+            }
+
+            String settingsToSendString = "";
+            serializeJson(settingsToSend, settingsToSendString);
+            mainVariable.getMQTT().publish("peristaltic/settings", settingsToSendString.c_str());
+        }
+    }
+    else
+        mainVariable.getDisplay().dispSetInfo("Direction can't be change when pump is running", true);
+}
+void trigger3()
+{
+    if (mainVariable.getPump().isRunning())
+    {
+        mainVariable.getDisplay().dispSetInfo("Settings can't be change when pump is running", true);
+    }
+    else
+    {
+        mainVariable.getDisplay().lastInteractionTimeMark = millis();
+        mainVariable.getDisplay().activePage = 1;
+        mainVariable.getDisplay().setPage(1);
+    }
+}
+void trigger4()
+{
+    if (!mainVariable.getPump().isRunning())
+    {
+        int set = (int)mainVariable.getPump().parameters.Mode;
+        mainVariable.getPump().setMode(++set);
+        mainVariable.getDisplay().menu.contentShow(0);
+
+        if (mainVariable.getMQTT().client.connected())
+        {
+            DynamicJsonDocument settingsToSend(1024);
+            for (size_t i = 0; i < SETTINGS_COUNT - 1; i++)
+            {
+                settingsToSend[i]["Name"] = mainVariable.getDisplay().menu.settings[i + 1].Name;
+                settingsToSend[i]["Value"] = mainVariable.getDisplay().menu.settings[i + 1].NumValue;
+                settingsToSend[i]["Unit"] = mainVariable.getDisplay().menu.settings[i + 1].Unit;
+            }
+
+            String settingsToSendString = "";
+            serializeJson(settingsToSend, settingsToSendString);
+            mainVariable.getMQTT().publish("peristaltic/settings", settingsToSendString.c_str());
+        }
+    }
+    else
+        mainVariable.getDisplay().dispSetInfo("Mode can't be change when pump is running", true);
+}
+void trigger5()
+{
+    Serial.println("");
+    Serial.println("trig5");
+    Serial.println("");
+}
+void trigger6()
+{
+    Serial.println("");
+    Serial.println("trig6");
+    Serial.println("");
+}
+void trigger7()
+{
+    Serial.println("");
+    Serial.println("trig7");
+    Serial.println("");
+}
+void trigger8()
+{
+    Serial.println("");
+    Serial.println("trig8");
+    Serial.println("");
+}
+void trigger9()
+{
+    Serial.println("");
+    Serial.println("trig9");
+    Serial.println("");
+}
+void trigger10()
+{
+    Serial.println("");
+    Serial.println("trig10");
+    Serial.println("");
 }

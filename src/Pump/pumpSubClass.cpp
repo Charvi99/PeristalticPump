@@ -7,8 +7,8 @@ Sensor::Sensor()
     busvoltage = 0;
     rawCurrent_mA = 0;
     smoothCurrent_mA = 0;
-    for (size_t i = 0; i <  (sizeof(rawCurrentArray)/sizeof(rawCurrentArray[0])); i++)
-        rawCurrentArray[i] = 0;    
+    for (size_t i = 0; i < (sizeof(rawCurrentArray) / sizeof(rawCurrentArray[0])); i++)
+        rawCurrentArray[i] = 0;
     loadvoltage = 0;
     power_mW = 0;
 }
@@ -19,7 +19,7 @@ Settings::Settings()
     PinDirection = 4;
     MaxCurrent = 200;
     MaxSpeed = 100;
-    RotationToMl = 100;
+    RotationToMl = 805;
     tubeLenght = 300;
     tubeDiameter = 3;
 }
@@ -40,6 +40,7 @@ Status::Status()
     Enable = false;
     Running = false;
     ActuallRotationCount = 0;
+    LastRotationCount = 0;
     WantedRotationCount = 0;
     ActuallRawCurrent = 0;
     filledTubes = false;

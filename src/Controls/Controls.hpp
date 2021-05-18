@@ -37,4 +37,5 @@ extern Control *control;
     
 void buttonReleaseLoop(Button2 &btn);
 void buttonPressLoop(Button2 &btn);
+void buttonLongPressLoop(Button2 &btn);
 

@@ -4,7 +4,7 @@
 #include <Display/Menu.h>
 #include <mainLib.h>
 
-#define SETTINGS_COUNT 11
+#define SETTINGS_COUNT 10
 
 #define UNFOCUSED 9
 #define FOCUSED 10
@@ -84,6 +84,8 @@ public:
     char *currentInfo = "";
     bool switcher2 = false;
     unsigned long lastIconUpdateTimeMark = 0;
+    unsigned long lastInteractionTimeMark = 0;
+    
     Display();
 
     void loop(bool up, bool down);
@@ -97,12 +99,11 @@ public:
     void dispSetInterval(char *content);
     void dispSetRamp(char *content);
     void dispSetInfo(char *content, bool warning);
-    void dispSetMl(int content);
+    void dispSetMl(long content);
     void dispGraph(int content);
     void dispRun(bool content);
 
     void initilazePic();
 };
 
-extern Display *disp;
 void enterNextionCommand();

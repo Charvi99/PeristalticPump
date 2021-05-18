@@ -17,6 +17,10 @@ Control& Global::getControl()
 {
     return _control;
 }
+Alarm& Global::getAlarm()
+{
+    return _alarm;
+}
 
 String &Global::getJSONSettings()
 {
@@ -25,4 +29,16 @@ String &Global::getJSONSettings()
 String &Global::getJSONData()
 {
     return _JsonData;
+}
+String &Global::getAlert()
+{
+    return _Alert;
+}
+int &Global::getAlertPriority()
+{
+    return _AlertPriority;
+}
+unsigned long &Global::getLastAlerUpdate()
+{
+    return _LastAlertUpdate;
 }

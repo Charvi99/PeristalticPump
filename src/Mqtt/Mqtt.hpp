@@ -1,8 +1,10 @@
 #pragma once
+#include <mainLib.h>
 #include <EspMQTTClient.h>
 #include <ArduinoJson.h>
-#include <mainLib.h>
 #include <Display/Display.hpp>
+#include <ESPAsyncWebServer.h>
+#include <AsyncElegantOTA.h>
 
 class MQTT
 {
@@ -16,6 +18,7 @@ private:
 public:
     WiFiClient espClient;
     PubSubClient client;
+    String test;
 
     MQTT();
     void publish(char *topic, const char *message);
@@ -28,6 +31,5 @@ public:
     void loop();
     void MQTTSetrup();
 };
-extern MQTT *mqtt;
 
 void callback(char *topic, byte *message, unsigned int length);

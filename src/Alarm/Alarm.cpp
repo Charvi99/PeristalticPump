@@ -3,41 +3,57 @@
 Alarm::Alarm()
 {
     //dont have idea about it
+    status = STOPED;
     strip.begin();
 }
 void Alarm::alarmLoop()
 {
+    status = (AlarmStatus)mainVariable.alarmStatus;
+
+    if ((status == MQTT_CONECTED || status == WARNING || status == ERROR))
+    {
+        stripUpdate();
+        mainVariable.alarmStatus = (int)Alarm::AlarmStatus::RUNNING;
+    }
+    else if (millis() - lastStatusUpdateTimeMark > 2000)
+    {
+        lastStatusUpdateTimeMark = millis();
+        stripUpdate();
+    }
+
+    //beeperLoop();
+}
+void Alarm::stripUpdate()
+{
     switch (status)
     {
-    case Status::RUNNING:
+    case AlarmStatus::RUNNING:
         showRun();
         LEDBreathing();
         break;
-    case Status::WARNING:
+    case AlarmStatus::WARNING:
         showWarning();
         break;
-    case Status::STOPED:
+    case AlarmStatus::STOPED:
         showStop();
         LEDBreathing();
         break;
-    case Status::ERROR:
+    case AlarmStatus::ERROR:
         showError();
         break;
-    case Status::MQTT_CONECTED:
+    case AlarmStatus::MQTT_CONECTED:
         showMQTT();
         LEDBreathing();
         break;
     default:
-        showStop();
+        showWarning();
         LEDBreathing();
         break;
     }
-    beeperLoop();
 }
 
 void Alarm::showRun()
 {
-    //strip.setLedColorData(i, strip.Wheel((i * 256 / LEDS_COUNT + j) & 255));
     strip.setAllLedsColor(0, 254, 0);
 }
 void Alarm::showStop()
@@ -46,30 +62,35 @@ void Alarm::showStop()
 }
 void Alarm::showWarning()
 {
-    strip.setAllLedsColor(254,254,0);
+    strip.setAllLedsColor(254, 254, 0);
 }
 void Alarm::showError()
 {
-    strip.setAllLedsColor(254,0,0);
+    strip.setAllLedsColor(254, 0, 0);
 }
 void Alarm::showMQTT()
 {
-    strip.setAllLedsColor(0,0,254);
+    strip.setAllLedsColor(0, 0, 254);
+}
+
+void Alarm::shutDownLED()
+{
+    strip.setAllLedsColor(0, 0, 0);
 }
 void Alarm::LEDBreathing()
 {
     if (millis() - lastStripUpdateTimeMark > 10)
     {
-        if (stripBrightnessRise == true && stripBrightnessLvl < 255)
+        if (stripBrightnessRise == true && stripBrightnessLvl < MAX_BRIGHTNESS)
         {
             stripBrightnessLvl++;
-            if (stripBrightnessLvl > 254)
+            if (stripBrightnessLvl > MAX_BRIGHTNESS)
                 stripBrightnessRise = false;
         }
-        else if (stripBrightnessRise == false && stripBrightnessLvl > 1)
+        else if (stripBrightnessRise == false && stripBrightnessLvl > MIN_BRIGHTNESS)
         {
             stripBrightnessLvl--;
-            if (stripBrightnessLvl <= 1)
+            if (stripBrightnessLvl <= MIN_BRIGHTNESS)
                 stripBrightnessRise = true;
         }
         strip.setBrightness(stripBrightnessLvl);
@@ -78,20 +99,10 @@ void Alarm::LEDBreathing()
 }
 void Alarm::SendData()
 {
-    if (mainVariable.getMQTT().client.connected() && millis() - lastDataSendTimeMark > DATA_SEND_FREQUENCY)
-    {
-        DynamicJsonDocument settingsToSend(1024);
-        for (size_t i = 0; i < DATA_COUNT; i++)
-        {
-        settingsToSend[i]["Name"] = settings[i].Name;
-        settingsToSend[i]["Value"] = settings[i].Value;
-        settingsToSend[i]["Unit"] = settings[i].Unit;
-        }
-        
-        
-        String settingsToSendString = "";
-        serializeJson(settingsToSend, settingsToSendString);
-        mainVariable.getMQTT().publish("peristaltic/data", settingsToSendString.c_str());
-        lastDataSendTimeMark = millis();
-    }
+}
+
+void Alarm::setStatus()
+{
+    status = AlarmStatus::RUNNING;
+    return;
 }

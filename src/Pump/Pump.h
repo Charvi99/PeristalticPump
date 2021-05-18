@@ -17,13 +17,13 @@
 #define GO 1
 #define STOP 0
 
-#define DRIVER_DIRECTION_PIN_CW 12
-#define DRIVER_DIRECTION_PIN_ACW 14
+#define DRIVER_DIRECTION_PIN_CW 14
+#define DRIVER_DIRECTION_PIN_ACW 27
 
 #define MIN_DUTY 180
 #define MAX_DUTY 254
 
-extern Adafruit_INA219 ina219;
+//extern Adafruit_INA219 ina219;
 extern ESP32Encoder pumpEncoder;
 
 class Pump
@@ -42,16 +42,18 @@ public:
     double currentSpeed = 0;
     double speedIncrement = 0;
     unsigned long lastSpeedIncrementTimeMark = 0;
+
     Pump();
-    void setup();
 
     void loop();
+
     void run();
+    void stop();
+
     void runManual();
     void runSemiManual();
     void runDose();
     void runIntervalDose();
-    void stop();
     void rampSpeedAdjustment();
 
     void pumpEnable();
@@ -81,5 +83,3 @@ public:
     long getMl();
     void resetRotation();
 };
-
-extern Pump *pumpa;

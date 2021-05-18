@@ -57,10 +57,11 @@ public:
     bool Enable;
     bool Running;
     long ActuallRotationCount;
+    long LastRotationCount;
     long WantedRotationCount;
     unsigned short ActuallRawCurrent;
     bool filledTubes;
     bool wifiConected;
     bool MQTTConnected;
     long duty;
-};
+    };

@@ -14,6 +14,8 @@ Control::Control()
     start_btn.setPressedHandler(buttonPressLoop);
     start_btn.setReleasedHandler(buttonReleaseLoop);
     stop_btn.setPressedHandler(buttonPressLoop);
+    stop_btn.setLongClickTime(10000);
+    stop_btn.setLongClickHandler(buttonLongPressLoop);
     encoder_btn.setClickHandler(buttonPressLoop);
 
     /* --- PINY KLAVESNICE --- */
@@ -53,25 +55,43 @@ void buttonPressLoop(Button2 &btn)
     if (btn == mainVariable.getControl().start_btn)
     {
         mainVariable.getPump().pumpEnable();
+        mainVariable.getMQTT().publish("peristaltic/run", "START");
+        mainVariable.getMQTT().publish("peristaltic/confirm", "ok");
+
         Serial.println("tlacitko start stisknuto");
+        mainVariable.getAlarm().showRun();
+        mainVariable.alarmStatus = 0;
     }
     /* --- STISKEM STOP VYPNU PUMPU --- */
     else if (btn == mainVariable.getControl().stop_btn)
     {
         mainVariable.getPump().pumpDisable();
         mainVariable.getPump().stop();
+        mainVariable.getMQTT().publish("peristaltic/run", "STOP");
+        mainVariable.getMQTT().publish("peristaltic/confirm", "ok");
+
         Serial.println("tlacitko stop stisknuto");
+        mainVariable.getAlarm().showStop();
+        mainVariable.alarmStatus = 1;
     }
 
     else if (btn == mainVariable.getControl().encoder_btn)
     {
         Serial.println("enc pressed");
-
+        mainVariable.getDisplay().lastInteractionTimeMark = millis();
+        
         /* --- STISKEM ENKODERU ZOBRAZIM NASTAVENI --- */
         if (mainVariable.getDisplay().activePage == 0)
         {
-            mainVariable.getDisplay().activePage = 1;
-            mainVariable.getDisplay().setPage(1);
+            if (mainVariable.getPump().isRunning())
+            {
+                mainVariable.getDisplay().dispSetInfo("Settings can't be change when pump is running", true);
+            }
+            else
+            {
+                mainVariable.getDisplay().activePage = 1;
+                mainVariable.getDisplay().setPage(1);
+            }
         }
         /* --- STISKEM ENKODERU V NASTAENI AKTIVUJI FOCUSNUTY PRVEK --- */
         else if (mainVariable.getDisplay().activePage == 1)
@@ -84,6 +104,12 @@ void buttonPressLoop(Button2 &btn)
             mainVariable.getDisplay().switcher = !mainVariable.getDisplay().switcher;
         }
     }
+}
+void buttonLongPressLoop(Button2 &btn)
+{
+    mainVariable.getDisplay().dispSetInfo("Rebooting in 5 seckonds",true);
+    delay(5000);
+    ESP.restart();
 }
 
 /* --- REAKCE NA AKCE ENKODERU --- */
@@ -153,22 +179,36 @@ void Control::loop()
     {
         unsigned pom = 0;
         if (digitalRead(19) == LOW)
-            pom = 0;
-        else if (digitalRead(23) == LOW)
             pom = 1;
+        else if (digitalRead(23) == LOW)
+            pom = 0;
         else if (digitalRead(18) == LOW)
-            pom = 2;
-        else if (digitalRead(5) == LOW)
             pom = 3;
+        else if (digitalRead(5) == LOW)
+            pom = 2;
 
         mainVariable.getPump().setMode(pom);
+        if (mainVariable.getMQTT().client.connected())
+        {
+            DynamicJsonDocument settingsToSend(1024);
+            for (size_t i = 0; i < SETTINGS_COUNT-1; i++)
+            {
+                settingsToSend[i]["Name"] = mainVariable.getDisplay().menu.settings[i+1].Name;
+                settingsToSend[i]["Value"] = mainVariable.getDisplay().menu.settings[i+1].NumValue;
+                settingsToSend[i]["Unit"] = mainVariable.getDisplay().menu.settings[i+1].Unit;
+            }
+
+            String settingsToSendString = "";
+            serializeJson(settingsToSend, settingsToSendString);
+            mainVariable.getMQTT().publish("peristaltic/settings", settingsToSendString.c_str());
+        }
         mainVariable.getDisplay().menu.contentShow(0);
     }
     else if ((mainVariable.getPump().isRunning() == true) && (digitalRead(19) == LOW || digitalRead(23) == LOW || digitalRead(18) == LOW || digitalRead(5) == LOW))
     {
-        mainVariable.getDisplay().dispSetInfo("Pri behu nelze zmenit mod rizeni", false);
+        mainVariable.getDisplay().dispSetInfo("Mode can't be change when pump is running", true);
         infoUpdateTimeMark = millis();
     }
-    if (mainVariable.getDisplay().currentInfo == "Pri behu nelze zmenit mod rizeni" && (millis() - infoUpdateTimeMark > 1000))
+    if (mainVariable.getDisplay().currentInfo == "Mode can't be change when pump is running" && (millis() - infoUpdateTimeMark > 1000))
         mainVariable.getDisplay().menu.contentShow(0);
 }
