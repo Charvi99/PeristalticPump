@@ -60,7 +60,7 @@ void Display::loop(bool up, bool down)
         {
             mainVariable.getPump().pumpDisable();
             mainVariable.alarmStatus = 3;
-            mainVariable.getDisplay().dispSetInfo("HIGH CURRENT CHECK  TUBES", true);
+            mainVariable.getDisplay().dispSetInfo("HIGH CURRENT  \r\r\r\r\r\r\r\r\r \n  CHECK  TUBES", true);
         }
         dispRun(mainVariable.getPump().isRunning());
     }
@@ -361,7 +361,7 @@ void Menu::deselectFocused()
     Serial.println("DESELECTED");
     Serial.println("DESELECTED");
 
-    /* --- APLIKOVANI ZMEN NA MQTT --- */
+    /* --- APLIKOVANI ZMEN NA MQTT --- *
 
     if (settings[9].NumValue == 1)
     {

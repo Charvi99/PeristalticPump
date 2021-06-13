@@ -209,6 +209,6 @@ void Control::loop()
         mainVariable.getDisplay().dispSetInfo("Mode can't be change when pump is running", true);
         infoUpdateTimeMark = millis();
     }
-    if (mainVariable.getDisplay().currentInfo == "Mode can't be change when pump is running" && (millis() - infoUpdateTimeMark > 1000))
+    if (mainVariable.getDisplay().currentInfo == "Mode can't be change when pump is running" && (millis() - infoUpdateTimeMark > 2000))
         mainVariable.getDisplay().menu.contentShow(0);
 }

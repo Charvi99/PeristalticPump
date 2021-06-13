@@ -118,6 +118,7 @@ void setup()
 {
     Serial.begin(115200);
     mainVariable.getAlarm().strip.setBrightness(80);
+    mainVariable.getDisplay().dispSetInfo("WELCOME",false);
     for (size_t i = 0; i < 3; i++)
     {
         mainVariable.getAlarm().showRun();
@@ -128,7 +129,7 @@ void setup()
     }
 
     Serial.println("Let's setup MQTT");
-    mainVariable.getMQTT().MQTTbegin();
+    //mainVariable.getMQTT().MQTTbegin();
     Serial.println("MQTT should work");
 
     pinMode(36, OUTPUT);
@@ -147,7 +148,7 @@ void setup()
     mainVariable.getPump().ina219.setCalibration_32V_2A();
 
     mainVariable.getDisplay().activePage = 0;
-    mainVariable.getDisplay().setPage(0);
+    //mainVariable.getDisplay().setPage(0);
     mainVariable.getDisplay().menu.contentShow(0);
 
     CoroutineScheduler::setup();
