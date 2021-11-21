@@ -7,8 +7,8 @@ AsyncWebServer server(80);
 /* --- KONSTRUKTOR MQTT --- */
 MQTT::MQTT()
 {
-  ssid = "Charvi99";
-  password = "charvijebozi";
+  ssid = "CharviWifi";
+  password = "xkvqqoac";
   mqtt_server = "mqtt.flespi.io";
   mqtt_user = "fZetFr07fPpzFxegftTmp7sSs1zOcbJgYNzu2op73Euw1wB6Nkh3hzLxo9ap8JvX";
   mqtt_pass = "";

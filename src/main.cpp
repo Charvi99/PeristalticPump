@@ -118,7 +118,7 @@ void setup()
 {
     Serial.begin(115200);
     mainVariable.getAlarm().strip.setBrightness(80);
-    mainVariable.getDisplay().dispSetInfo("WELCOME",false);
+    mainVariable.getDisplay().dispSetInfo("WELCOME", false);
     for (size_t i = 0; i < 3; i++)
     {
         mainVariable.getAlarm().showRun();
@@ -129,7 +129,7 @@ void setup()
     }
 
     Serial.println("Let's setup MQTT");
-    //mainVariable.getMQTT().MQTTbegin();
+    mainVariable.getMQTT().MQTTbegin();
     Serial.println("MQTT should work");
 
     pinMode(36, OUTPUT);
@@ -163,6 +163,9 @@ int readLightSensor()
     return adc1_get_raw(ADC1_CHANNEL_0);                        //Read analog
 }
 int test = 3;
+unsigned long RotationMark1 = 0;
+unsigned long RotationMark2 = 0;
+
 void loop()
 {
     if (test < 3)
@@ -195,8 +198,40 @@ void loop()
     }
     else
     {
-        CoroutineScheduler::loop();
+        //CoroutineScheduler::loop();
+
+        mainVariable.getPump().resetRotation();
+        digitalWrite(DRIVER_DIRECTION_PIN_CW, LOW);
+        digitalWrite(DRIVER_DIRECTION_PIN_ACW, HIGH);
+
+        for (size_t i = 0; i < 3; i++)
+        {
+            mainVariable.getPump().resetRotation();
+            RotationMark1 = mainVariable.getPump().getRotation();
+
+            ledcWrite(0, 254);
+            delay(15000);
+
+            mainVariable.getPump().stop();
+            RotationMark2 = mainVariable.getPump().getRotation();
+
+            Serial.print(RotationMark1);
+            Serial.print(";");
+            Serial.print(RotationMark2);
+            Serial.print(";");
+            Serial.print(RotationMark2 - RotationMark1);
+            Serial.print(";");
+
+            Serial.println();
+
+            delay(60000);
+            AsyncElegantOTA.loop();
+        }
+        
+
+
+        delay(3600000);
+
         AsyncElegantOTA.loop();
     }
-
 }
